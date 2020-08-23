@@ -1,0 +1,108 @@
+{ lib, bash, nodejs, perl, stdenv, writeText }:
+
+with lib;
+
+let
+
+  # Variables provided by the generator.
+  project-name = @@PROJECT_NAME@@;
+  offline-cache-hash = @@OFFLINE_CACHE_HASH@@;
+  yarn-path = @@YARN_PATH@@;
+  yarn-closure-entries = @@YARN_CLOSURE_ENTRIES@@;
+
+  # Defines the shell alias to run Yarn.
+  yarn-alias = ''
+    yarn() {
+      CI=1 "$NIX_YARN_PATH" "$@"
+    }
+  '';
+
+  # Directory of just the files needed to run Yarn.
+  yarn-closure = cleanSourceWith {
+    src = ./.;
+    filter = let
+      srcStr = toString ./.;
+      srcRel = removePrefix "${srcStr}/";
+    in path: type:
+      elem "${type}:${srcRel path}" yarn-closure-entries;
+  };
+
+  # Build just the offline cache for the project.
+  offline-cache = stdenv.mkDerivation {
+    name = "${project-name}-offline-cache";
+    buildInputs = [ nodejs ];
+    builder = writeText "builder.sh" ''
+      source $stdenv/setup
+      cd ${yarn-closure}
+
+      # Yarn may need a writable home directory for the global cache mirror.
+      # TODO: Can't disable the mirror, because it changes cache filenames.
+      export HOME="$TEMP"
+
+      # Setup to environment so we can run Yarn.
+      export NIX_YARN_PATH="$PWD/${yarn-path}"
+      ${yarn-alias}
+
+      # Invoke a plugin internal command to build the cache.
+      yarn nixify build-cache $out
+    '';
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+    outputHash = offline-cache-hash;
+  };
+
+in stdenv.mkDerivation {
+  name = project-name;
+  src = ./.;
+
+  # Tell node-gyp to use the provided Node.js headers for native code builds.
+  npm_config_nodedir = nodejs;
+  # Tell node-pre-gyp to never fetch binaries / always build from source.
+  npm_config_build_from_source = "true";
+
+  # Make sure the build uses the right Node.js version everywhere.
+  buildInputs = [ nodejs ];
+
+  # Define the Yarn alias in the build environment.
+  postHook = yarn-alias;
+
+  configurePhase = ''
+    runHook preConfigure
+
+    # Move the entire project to the output directory.
+    # TODO: Would rather do this in 'installPhase',
+    # but '.pnp.js' is generated with relative paths.
+    mkdir -p $out/libexec $out/bin
+    mv $PWD "$out/libexec/$sourceRoot"
+    cd "$out/libexec/$sourceRoot"
+
+    # Store the absolute path to Yarn for the 'yarn' alias.
+    export NIX_YARN_PATH="$PWD/${yarn-path}"
+
+    # Point Yarn to the offline cache built separately.
+    yarn config set cacheFolder '${offline-cache}'
+
+    # Run normal Yarn install to complete dependency installation.
+    yarn install --immutable --immutable-cache
+
+    runHook postConfigure
+  '';
+
+  buildPhase = ''
+    runHook preBuild
+    runHook postBuild
+  '';
+
+  installPhase = ''
+    runHook preInstall
+
+    # Invoke a plugin internal command to setup binaries.
+    yarn nixify install-bin $out/bin
+
+    runHook postInstall
+  '';
+
+  passthru = {
+    inherit yarn-closure offline-cache;
+  };
+}
