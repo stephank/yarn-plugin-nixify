@@ -16,7 +16,7 @@ let
   # Defines the shell alias to run Yarn.
   yarn-alias = ''
     yarn() {
-      CI=1 "$NIX_YARN_PATH" "$@"
+      CI=1 node "$NIX_YARN_PATH" "$@"
     }
   '';
 
