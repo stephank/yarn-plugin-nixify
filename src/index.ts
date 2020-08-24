@@ -7,11 +7,11 @@ import {
   CommandContext,
   Configuration,
   Hooks,
+  LocatorHash,
   Plugin,
   Project,
   Report,
   StreamReport,
-  execUtils,
   structUtils,
 } from "@yarnpkg/core";
 
@@ -20,7 +20,7 @@ import defaultExprTmpl from "./default.nix.in";
 import projectExprTmpl from "./yarn-project.nix.in";
 
 // Generator function that runs after `yarn install`.
-const generate = async (project: Project, report: Report) => {
+const generate = async (project: Project, cache: Cache, report: Report) => {
   const { configuration, cwd } = project;
   const yarnPathAbs = configuration.get(`yarnPath`);
   const cacheFolderAbs = configuration.get(`cacheFolder`);
@@ -99,25 +99,25 @@ const generate = async (project: Project, report: Report) => {
     }
   }
 
-  // Build the Nix output-hash by hashing the Yarn cache folder. The
-  // derivation should build the exact same.
-  let cacheHash = ``;
-  try {
-    const hasherResult = await execUtils.execvp(
-      `nix-hash`,
-      [`--type`, `sha256`, `--base32`, cacheFolder],
-      { cwd, encoding: `utf8`, strict: true }
-    );
-    cacheHash = hasherResult.stdout.trim();
-  } catch (err) {
-    if (err.code === `ENOENT`) {
-      report.reportWarning(
-        0,
-        `No Nix installation found - yarn-project.nix will not be updated`
-      );
-    } else {
-      throw err;
-    }
+  // Build a list of cache entries so Nix can fetch them.
+  let cacheEntries = [];
+  const cacheFiles = new Set(xfs.readdirSync(cache.cwd));
+  for (const pkg of project.storedPackages.values()) {
+    const checksum = project.storedChecksums.get(pkg.locatorHash);
+    if (!checksum) continue;
+
+    const cachePath = cache.getLocatorPath(pkg, checksum);
+    if (!cachePath) continue;
+
+    const filename = ppath.basename(cachePath);
+    if (!cacheFiles.has(filename)) continue;
+
+    const sha512 = checksum.split(`/`).pop();
+    cacheEntries.push([
+      `filename = ${JSON.stringify(filename)};`,
+      `sha512 = ${JSON.stringify(sha512)};`,
+      `locator-hash = ${JSON.stringify(pkg.locatorHash)};`,
+    ]);
   }
 
   // Render the Nix expression.
@@ -126,15 +126,22 @@ const generate = async (project: Project, report: Report) => {
   const projectExpr = projectExprTmpl
     .replace(`@@PROJECT_NAME@@`, JSON.stringify(projectName))
     .replace(`@@CACHE_FOLDER@@`, JSON.stringify(cacheFolder))
-    .replace(`@@CACHE_HASH@@`, JSON.stringify(cacheHash))
+    .replace(
+      `@@CACHE_ENTRIES@@`,
+      `[\n` +
+        [...cacheEntries]
+          .map((entry) => `    { ${entry.join(` `)} }\n`)
+          .join(``) +
+        `  ]`
+    )
     .replace(`@@YARN_PATH@@`, JSON.stringify(yarnPath))
     .replace(
       `@@YARN_CLOSURE_ENTRIES@@`,
-      `[ ` +
+      `[\n` +
         [...yarnClosureEntries]
-          .map((entry) => JSON.stringify(entry))
-          .join(` `) +
-        ` ]`
+          .map((entry) => `    ${JSON.stringify(entry)}\n`)
+          .join(``) +
+        `  ]`
     );
   const projectExprPath = ppath.join(cwd, `yarn-project.nix` as Filename);
   xfs.writeFileSync(projectExprPath, projectExpr);
@@ -150,40 +157,41 @@ const generate = async (project: Project, report: Report) => {
   }
 };
 
-// Internal command that does just the fetch part of `yarn install`.
-// Used inside the Nix offline-cache derivation to build the cache.
-class BuildCacheCommand extends Command<CommandContext> {
+// Internal command that fetches a single locator.
+// Used from within Nix to build the cache for the project.
+class FetchOneCommand extends Command<CommandContext> {
   @Command.String()
-  out: string = ``;
+  locatorHash: string = ``;
 
-  @Command.Path(`nixify`, `build-cache`)
+  @Command.Path(`nixify`, `fetch-one`)
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,
       this.context.plugins
     );
-
-    // Overwrite the cache directory to our output directory.
-    configuration.use(
-      `<nixify>`,
-      { cacheFolder: this.out },
-      configuration.projectCwd!,
-      { overwrite: true }
-    );
-
     const { project } = await Project.find(configuration, this.context.cwd);
     const cache = await Cache.find(configuration);
 
-    // Run resolution and fetch steps.
+    const fetcher = configuration.makeFetcher();
+
     const report = await StreamReport.start(
       { configuration, stdout: this.context.stdout },
       async (report) => {
-        await report.startTimerPromise(`Resolution step`, () =>
-          project.resolveEverything({ report, lockfileOnly: true })
+        const pkg = project.originalPackages.get(
+          this.locatorHash as LocatorHash
         );
-        await report.startTimerPromise(`Fetch step`, () =>
-          project.fetchEverything({ cache, report })
-        );
+        if (!pkg) {
+          report.reportError(0, `Invalid locator hash`);
+          return;
+        }
+
+        await fetcher.fetch(pkg, {
+          checksums: project.storedChecksums,
+          project,
+          cache,
+          fetcher,
+          report,
+        });
       }
     );
 
@@ -228,11 +236,11 @@ class InstallBinCommand extends Command<CommandContext> {
 }
 
 const plugin: Plugin<Hooks> = {
-  commands: [BuildCacheCommand, FetchLocatorCommand, InstallBinCommand],
+  commands: [FetchOneCommand, InstallBinCommand],
   hooks: {
     afterAllInstalled: async (project, opts) => {
       if (opts.persistProject !== false) {
-        await generate(project, opts.report);
+        await generate(project, opts.cache, opts.report);
       }
     },
   },

@@ -10,7 +10,7 @@ let
   # Variables provided by the generator.
   project-name = @@PROJECT_NAME@@;
   cache-folder = @@CACHE_FOLDER@@;
-  cache-hash = @@CACHE_HASH@@;
+  cache-entries = @@CACHE_ENTRIES@@;
   yarn-path = @@YARN_PATH@@;
   yarn-closure-entries = @@YARN_CLOSURE_ENTRIES@@;
 
@@ -31,29 +31,43 @@ let
       elem "${type}:${srcRel path}" yarn-closure-entries;
   };
 
-  # Build just the cache for the project.
-  offline-cache = stdenv.mkDerivation {
-    name = "${project-name}-offline-cache";
+  # Fetch a single dependency.
+  fetch = { filename, sha512, locator-hash }: stdenv.mkDerivation {
+    name = replaceStrings [ "@" ] [ "-" ] filename;
     buildInputs = [ nodejs ];
-    builder = writeText "builder.sh" ''
+    builder = builtins.toFile "builder.sh" ''
       source $stdenv/setup
-      cd '${yarn-closure}'
 
       # Yarn may need a writable home directory for the global cache mirror.
       # TODO: Can't disable the mirror, because it changes cache filenames.
-      export HOME="$TEMP"
+      export HOME="$PWD"
+
+      # Fetch into the build directory.
+      export yarn_cache_folder="$PWD"
 
       # Setup to environment so we can run Yarn.
+      pushd '${yarn-closure}' > /dev/null
+
       export NIX_YARN_PATH="$(readlink -f '${yarn-path}')"
       ${yarn-alias}
 
       # Invoke a plugin internal command to build the cache.
-      yarn nixify build-cache $out
+      yarn nixify fetch-one '${locator-hash}'
+
+      popd > /dev/null
+
+      # The cache file that was just fetched is our output.
+      mv '${filename}' $out
     '';
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = cache-hash;
+    outputHashMode = "flat";
+    outputHashAlgo = "sha512";
+    outputHash = sha512;
   };
+
+  # Shell snippet to collect all project dependencies.
+  collect-cache = concatMapStrings (args: ''
+    cp ${fetch args} './${args.filename}'
+  '') cache-entries;
 
 in stdenv.mkDerivation {
   name = project-name;
@@ -74,11 +88,12 @@ in stdenv.mkDerivation {
     runHook preConfigure
 
     # Copy over the Yarn cache.
-    # TODO: Can we do without the copy somehow?
+    # TODO: Can we do without the copy somehow? Links don't work.
     rm -fr '${cache-folder}'
-    mkdir -p "$(dirname '${cache-folder}')"
-    cp -r '${offline-cache}' '${cache-folder}'
-    chmod -R u+w '${cache-folder}'
+    mkdir -p '${cache-folder}'
+    pushd '${cache-folder}' > /dev/null
+    ${collect-cache}
+    popd > /dev/null
 
     # Store the absolute path to Yarn for the 'yarn' alias.
     export NIX_YARN_PATH="$(readlink -f '${yarn-path}')"
