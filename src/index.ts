@@ -23,6 +23,7 @@ import projectExprTmpl from "./yarn-project.nix.in";
 const generate = async (project: Project, report: Report) => {
   const { configuration, cwd } = project;
   const yarnPathAbs = configuration.get(`yarnPath`);
+  const cacheFolderAbs = configuration.get(`cacheFolder`);
   const lockfileFilename = configuration.get(`lockfileFilename`);
 
   // TODO: Should try to remove this. Our binary wrappers currently do
@@ -40,7 +41,16 @@ const generate = async (project: Project, report: Report) => {
     yarnPath = yarnPathAbs;
     report.reportWarning(
       0,
-      `The Yarn path ${yarnPathAbs} is outside the project directory - it cannot be reached by the Nix build`
+      `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`
+    );
+  }
+
+  let cacheFolder = ppath.relative(cwd, cacheFolderAbs);
+  if (cacheFolder.startsWith(`../`)) {
+    cacheFolder = cacheFolderAbs;
+    report.reportWarning(
+      0,
+      `The cache folder ${cacheFolderAbs} is outside the project - it may not be reachable by the Nix build`
     );
   }
 
@@ -74,7 +84,7 @@ const generate = async (project: Project, report: Report) => {
       if (inputPath !== yarnPath) {
         report.reportWarning(
           0,
-          `The path ${inputPath} is outside the project directory and was ignored - it may not be reachable in the Nix build`
+          `The path ${inputPath} is outside the project and was ignored - it may not be reachable in the Nix build`
         );
       }
       continue;
@@ -91,7 +101,6 @@ const generate = async (project: Project, report: Report) => {
 
   // Build the Nix output-hash by hashing the Yarn cache folder. The
   // derivation should build the exact same.
-  const cacheFolder = configuration.get(`cacheFolder`);
   let cacheHash = ``;
   try {
     const hasherResult = await execUtils.execvp(
@@ -116,7 +125,8 @@ const generate = async (project: Project, report: Report) => {
   const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
   const projectExpr = projectExprTmpl
     .replace(`@@PROJECT_NAME@@`, JSON.stringify(projectName))
-    .replace(`@@OFFLINE_CACHE_HASH@@`, JSON.stringify(cacheHash))
+    .replace(`@@CACHE_FOLDER@@`, JSON.stringify(cacheFolder))
+    .replace(`@@CACHE_HASH@@`, JSON.stringify(cacheHash))
     .replace(`@@YARN_PATH@@`, JSON.stringify(yarnPath))
     .replace(
       `@@YARN_CLOSURE_ENTRIES@@`,

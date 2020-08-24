@@ -9,7 +9,8 @@ let
 
   # Variables provided by the generator.
   project-name = @@PROJECT_NAME@@;
-  offline-cache-hash = @@OFFLINE_CACHE_HASH@@;
+  cache-folder = @@CACHE_FOLDER@@;
+  cache-hash = @@CACHE_HASH@@;
   yarn-path = @@YARN_PATH@@;
   yarn-closure-entries = @@YARN_CLOSURE_ENTRIES@@;
 
@@ -30,13 +31,13 @@ let
       elem "${type}:${srcRel path}" yarn-closure-entries;
   };
 
-  # Build just the offline cache for the project.
+  # Build just the cache for the project.
   offline-cache = stdenv.mkDerivation {
     name = "${project-name}-offline-cache";
     buildInputs = [ nodejs ];
     builder = writeText "builder.sh" ''
       source $stdenv/setup
-      cd ${yarn-closure}
+      cd '${yarn-closure}'
 
       # Yarn may need a writable home directory for the global cache mirror.
       # TODO: Can't disable the mirror, because it changes cache filenames.
@@ -51,7 +52,7 @@ let
     '';
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = offline-cache-hash;
+    outputHash = cache-hash;
   };
 
 in stdenv.mkDerivation {
@@ -72,18 +73,15 @@ in stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
 
-    # Move the entire project to the output directory.
-    # TODO: Would rather do this in 'installPhase',
-    # but '.pnp.js' is generated with relative paths.
-    mkdir -p $out/libexec $out/bin
-    mv $PWD "$out/libexec/$sourceRoot"
-    cd "$out/libexec/$sourceRoot"
+    # Copy over the Yarn cache.
+    # TODO: Can we do without the copy somehow?
+    rm -fr '${cache-folder}'
+    mkdir -p "$(dirname '${cache-folder}')"
+    cp -r '${offline-cache}' '${cache-folder}'
+    chmod -R u+w '${cache-folder}'
 
     # Store the absolute path to Yarn for the 'yarn' alias.
-    export NIX_YARN_PATH="$(readlink -f ${yarn-path})"
-
-    # Point Yarn to the offline cache built separately.
-    yarn config set cacheFolder '${offline-cache}'
+    export NIX_YARN_PATH="$(readlink -f '${yarn-path}')"
 
     # Run normal Yarn install to complete dependency installation.
     yarn install --immutable --immutable-cache
@@ -98,6 +96,15 @@ in stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
+
+    mkdir -p $out/libexec $out/bin
+
+    # Move the entire project to the output directory.
+    mv $PWD "$out/libexec/$sourceRoot"
+    cd "$out/libexec/$sourceRoot"
+
+    # Update the path to Yarn.
+    export NIX_YARN_PATH="$(readlink -f '${yarn-path}')"
 
     # Invoke a plugin internal command to setup binaries.
     yarn nixify install-bin $out/bin
