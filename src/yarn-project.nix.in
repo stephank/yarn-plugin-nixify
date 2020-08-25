@@ -21,7 +21,7 @@ let
   '';
 
   # Fetch a single dependency.
-  fetch = { filename, sha512, locator-hash }: stdenv.mkDerivation {
+  fetch-one = { filename, sha512, locator-hash }: stdenv.mkDerivation {
     name = replaceStrings [ "@" ] [ "-" ] filename;
     buildInputs = [ nodejs ];
     builder = builtins.toFile "builder.sh" ''
@@ -55,7 +55,7 @@ let
 
   # Shell snippet to collect all project dependencies.
   collect-cache = concatMapStrings (args: ''
-    cp ${fetch args} './${args.filename}'
+    cp ${fetch-one args} './${args.filename}'
   '') cache-entries;
 
 in stdenv.mkDerivation {
