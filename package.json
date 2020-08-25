@@ -21,6 +21,7 @@
     "webpack-sources": "^1.4.3"
   },
   "scripts": {
+    "check": "tsc",
     "build": "./build.js -p",
     "build-dev": "./build.js",
     "fmt": "prettier --write src"

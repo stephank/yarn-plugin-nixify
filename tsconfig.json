@@ -4,7 +4,9 @@
     "module": "commonjs",
     "target": "es2018",
     "lib": ["es2018"],
-    "strict": true
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true
   },
   "include": ["src/**/*.ts"]
 }
