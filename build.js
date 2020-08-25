@@ -13,6 +13,7 @@ const EXTERNALS = [
   `@yarnpkg/fslib`,
   `@yarnpkg/plugin-pnp`,
   `clipanion`,
+  `crypto`,
 ];
 
 const compiler = webpack({

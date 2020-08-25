@@ -1,8 +1,32 @@
-import { Cache, Project, Report, structUtils } from "@yarnpkg/core";
-import { Filename, PortablePath, ppath, xfs } from "@yarnpkg/fslib";
+import { Filename, npath, PortablePath, ppath, xfs } from "@yarnpkg/fslib";
+import { computeFixedOutputStorePath } from "./nixUtils";
+
+import {
+  Cache,
+  execUtils,
+  LocatorHash,
+  Project,
+  Report,
+  structUtils,
+} from "@yarnpkg/core";
 
 import defaultExprTmpl from "./tmpl/default.nix.in";
 import projectExprTmpl from "./tmpl/yarn-project.nix.in";
+
+interface CacheEntry {
+  name: string;
+  filename: Filename;
+  sha512: string;
+  locatorHash: LocatorHash;
+}
+
+const cacheEntryToNix = (entry: CacheEntry) =>
+  [
+    `name = ${JSON.stringify(entry.name)};`,
+    `filename = ${JSON.stringify(entry.filename)};`,
+    `sha512 = ${JSON.stringify(entry.sha512)};`,
+    `locatorHash = ${JSON.stringify(entry.locatorHash)};`,
+  ].join(` `);
 
 // Generator function that runs after `yarn install`.
 export default async (project: Project, cache: Cache, report: Report) => {
@@ -41,10 +65,11 @@ export default async (project: Project, cache: Cache, report: Report) => {
   }
 
   // Build a list of cache entries so Nix can fetch them.
-  let cacheEntries = [];
+  let cacheEntries: CacheEntry[] = [];
   const cacheFiles = new Set(xfs.readdirSync(cache.cwd));
   for (const pkg of project.storedPackages.values()) {
-    const checksum = project.storedChecksums.get(pkg.locatorHash);
+    const { version, locatorHash } = pkg;
+    const checksum = project.storedChecksums.get(locatorHash);
     if (!checksum) continue;
 
     const cachePath = cache.getLocatorPath(pkg, checksum);
@@ -54,17 +79,12 @@ export default async (project: Project, cache: Cache, report: Report) => {
     if (!cacheFiles.has(filename)) continue;
 
     let name = structUtils.slugifyIdent(pkg).replace(/^@/, "_at_");
-    if (pkg.version) {
-      name += `-${pkg.version}`;
+    if (version) {
+      name += `-${version}`;
     }
 
-    const sha512 = checksum.split(`/`).pop();
-    cacheEntries.push([
-      `name = ${JSON.stringify(name)};`,
-      `filename = ${JSON.stringify(filename)};`,
-      `sha512 = ${JSON.stringify(sha512)};`,
-      `locatorHash = ${JSON.stringify(pkg.locatorHash)};`,
-    ]);
+    const sha512 = checksum.split(`/`).pop()!;
+    cacheEntries.push({ name, filename, sha512, locatorHash });
   }
 
   // Render the Nix expression.
@@ -77,8 +97,8 @@ export default async (project: Project, cache: Cache, report: Report) => {
     .replace(
       `@@CACHE_ENTRIES@@`,
       `[\n` +
-        [...cacheEntries]
-          .map((entry) => `    { ${entry.join(` `)} }\n`)
+        cacheEntries
+          .map((entry) => `    { ${cacheEntryToNix(entry)} }\n`)
           .join(``) +
         `  ]`
     );
@@ -93,5 +113,52 @@ export default async (project: Project, cache: Cache, report: Report) => {
       0,
       `A minimal default.nix was created. You may want to customize it.`
     );
+  }
+
+  // Preload the cache entries into the Nix store.
+  if (xfs.existsSync(npath.toPortablePath(`/nix/store`))) {
+    xfs.mktempPromise(async (tempDir) => {
+      const toPreload: PortablePath[] = [];
+      for (const { name, filename, sha512 } of cacheEntries) {
+        // Check to see if the Nix store entry already exists.
+        const hash = Buffer.from(sha512, "hex");
+        const storePath = computeFixedOutputStorePath(name, `sha512`, hash);
+        if (!xfs.existsSync(storePath)) {
+          // The nix-store command requires a correct filename on disk, so we
+          // prepare a temporary directory containing all the files to preload.
+          const src = ppath.join(cache.cwd, filename);
+          const dst = ppath.join(tempDir, name as Filename);
+          await xfs.copyFilePromise(src, dst);
+          toPreload.push(dst);
+        }
+      }
+
+      try {
+        // Preload in batches, to keep the exec arguments reasonable.
+        const numToPreload = toPreload.length;
+        while (toPreload.length !== 0) {
+          const batch = toPreload.splice(0, 100);
+          await execUtils.execvp(
+            "nix-store",
+            ["--add-fixed", "sha512", ...batch],
+            {
+              cwd: project.cwd,
+              strict: true,
+            }
+          );
+        }
+        if (numToPreload !== 0) {
+          report.reportInfo(
+            0,
+            `Preloaded ${numToPreload} packages into the Nix store`
+          );
+        }
+      } catch (err) {
+        // Don't break if there appears to be no Nix installation after all.
+        if (err.code !== "ENOENT") {
+          throw err;
+        }
+      }
+    });
   }
 };
