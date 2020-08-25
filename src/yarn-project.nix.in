@@ -9,10 +9,9 @@ let
 
   # Variables provided by the generator.
   project-name = @@PROJECT_NAME@@;
+  yarn-path = @@YARN_PATH@@;
   cache-folder = @@CACHE_FOLDER@@;
   cache-entries = @@CACHE_ENTRIES@@;
-  yarn-path = @@YARN_PATH@@;
-  yarn-closure-entries = @@YARN_CLOSURE_ENTRIES@@;
 
   # Defines the shell alias to run Yarn.
   yarn-alias = ''
@@ -20,16 +19,6 @@ let
       CI=1 node "$NIX_YARN_PATH" "$@"
     }
   '';
-
-  # Directory of just the files needed to run Yarn.
-  yarn-closure = cleanSourceWith {
-    inherit src;
-    filter = let
-      srcStr = toString src;
-      srcRel = removePrefix "${srcStr}/";
-    in path: type:
-      elem "${type}:${srcRel path}" yarn-closure-entries;
-  };
 
   # Fetch a single dependency.
   fetch = { filename, sha512, locator-hash }: stdenv.mkDerivation {
@@ -46,7 +35,7 @@ let
       export yarn_cache_folder="$PWD"
 
       # Setup to environment so we can run Yarn.
-      pushd '${yarn-closure}' > /dev/null
+      pushd '${src}' > /dev/null
 
       export NIX_YARN_PATH="$(readlink -f '${yarn-path}')"
       ${yarn-alias}
@@ -128,6 +117,6 @@ in stdenv.mkDerivation {
   '';
 
   passthru = {
-    inherit yarn-closure offline-cache;
+    inherit offline-cache;
   };
 }
