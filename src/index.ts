@@ -71,11 +71,17 @@ const generate = async (project: Project, cache: Cache, report: Report) => {
     const filename = ppath.basename(cachePath);
     if (!cacheFiles.has(filename)) continue;
 
+    let name = structUtils.slugifyIdent(pkg).replace(/^@/, "_at_");
+    if (pkg.version) {
+      name += `-${pkg.version}`;
+    }
+
     const sha512 = checksum.split(`/`).pop();
     cacheEntries.push([
+      `name = ${JSON.stringify(name)};`,
       `filename = ${JSON.stringify(filename)};`,
       `sha512 = ${JSON.stringify(sha512)};`,
-      `locator-hash = ${JSON.stringify(pkg.locatorHash)};`,
+      `locatorHash = ${JSON.stringify(pkg.locatorHash)};`,
     ]);
   }
 
