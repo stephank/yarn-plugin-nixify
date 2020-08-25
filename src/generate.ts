@@ -34,6 +34,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
   const yarnPathAbs = configuration.get(`yarnPath`);
   const cacheFolderAbs = configuration.get(`cacheFolder`);
 
+  // Sanity checks.
   let yarnPath = ppath.relative(cwd, yarnPathAbs);
   if (yarnPath.startsWith(`../`)) {
     yarnPath = yarnPathAbs;
