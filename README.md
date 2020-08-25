@@ -23,8 +23,18 @@ to be customized, for example:
 let
 
   project = pkgs.callPackage ./yarn-project.nix {
+
+    # Example of providing a different source.
+    src = fetchFromGitHub {
+      owner = "johndoe";
+      repo = "myproject";
+      rev = "v1.0.0";
+      sha256 = "1hdhafj726g45gh7nj8qv1xls8mps3vhzq3aasdymbdqcb1clhkz";
+    };
+
     # Example of selecting a specific version of Node.js.
     nodejs = pkgs.nodejs-14_x;
+
   };
 
 in project.overrideAttrs (oldAttrs: {
