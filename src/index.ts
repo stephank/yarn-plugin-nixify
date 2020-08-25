@@ -15,9 +15,12 @@ import {
   structUtils,
 } from "@yarnpkg/core";
 
-import binTmpl from "./bin-wrapper.sh.in";
+import binWrapperPnpTmpl from "./bin-wrapper-pnp.sh.in";
+import binWrapperNodeModulesTmpl from "./bin-wrapper-node-modules.sh.in";
 import defaultExprTmpl from "./default.nix.in";
 import projectExprTmpl from "./yarn-project.nix.in";
+
+const supportedLinkers = [`pnp`, `node-modules`];
 
 // Generator function that runs after `yarn install`.
 const generate = async (project: Project, cache: Cache, report: Report) => {
@@ -25,16 +28,6 @@ const generate = async (project: Project, cache: Cache, report: Report) => {
   const yarnPathAbs = configuration.get(`yarnPath`);
   const cacheFolderAbs = configuration.get(`cacheFolder`);
   const lockfileFilename = configuration.get(`lockfileFilename`);
-
-  // TODO: Should try to remove this. Our binary wrappers currently do
-  // `node -r .pnp.js <bin>`, but not even sure if that's supported.
-  if (configuration.get(`nodeLinker`) !== `pnp`) {
-    report.reportWarning(
-      0,
-      `Currently, yarn-plugin-nixify only supports 'pnp' for the 'nodeLinker' setting.`
-    );
-    return;
-  }
 
   let yarnPath = ppath.relative(cwd, yarnPathAbs);
   if (yarnPath.startsWith(`../`)) {
@@ -216,22 +209,53 @@ class InstallBinCommand extends Command<CommandContext> {
       this.context.cwd
     );
 
-    if (workspace) {
-      const binDir = npath.toPortablePath(this.binDir);
-      const pnpPath = getPnpPath(project).main;
-      for (const [name, scriptInput] of workspace.manifest.bin) {
-        const binPath = ppath.join(binDir, name as Filename);
-        const scriptPath = ppath.join(
-          project.cwd,
-          npath.toPortablePath(scriptInput)
-        );
-        const script = binTmpl
-          .replace(`@@PNP_PATH@@`, pnpPath)
-          .replace(`@@SCRIPT_PATH@@`, scriptPath);
-        xfs.writeFileSync(binPath, script);
-        xfs.chmodSync(binPath, 0o755);
+    const report = await StreamReport.start(
+      { configuration, stdout: this.context.stdout },
+      async (report) => {
+        if (!workspace || workspace.manifest.bin.size === 0) {
+          return;
+        }
+
+        let nodeLinker = configuration.get(`nodeLinker`);
+        if (!supportedLinkers.includes(nodeLinker)) {
+          nodeLinker = `node-modules`;
+          report.reportWarning(
+            0,
+            `The nodeLinker ${nodeLinker} is not supported - executables may have trouble finding dependencies`
+          );
+        }
+
+        const binDir = npath.toPortablePath(this.binDir);
+        const pnpPath = getPnpPath(project).main;
+        for (const [name, scriptInput] of workspace.manifest.bin) {
+          const binPath = ppath.join(binDir, name as Filename);
+          const scriptPath = ppath.join(
+            project.cwd,
+            npath.toPortablePath(scriptInput)
+          );
+
+          let script;
+          switch (nodeLinker) {
+            case `pnp`:
+              script = binWrapperPnpTmpl
+                .replace(`@@PNP_PATH@@`, pnpPath)
+                .replace(`@@SCRIPT_PATH@@`, scriptPath);
+              break;
+            case `node-modules`:
+              script = binWrapperNodeModulesTmpl.replace(
+                `@@SCRIPT_PATH@@`,
+                scriptPath
+              );
+              break;
+            default:
+              throw Error(`Invalid nodeLinker ${nodeLinker}`);
+          }
+
+          xfs.writeFileSync(binPath, script);
+          xfs.chmodSync(binPath, 0o755);
+        }
       }
-    }
+    );
   }
 }
 

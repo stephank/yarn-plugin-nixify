@@ -22,6 +22,7 @@
   },
   "scripts": {
     "build": "./build.js -p",
-    "build-dev": "./build.js"
+    "build-dev": "./build.js",
+    "fmt": "prettier --write src"
   }
 }
