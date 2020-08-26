@@ -7,8 +7,13 @@ Generates a Nix expression to build a Yarn v2 project (not using zero-install).
 ## Usage
 
 ```sh
+# Install the plugin.
 yarn plugin import https://raw.githubusercontent.com/stephank/yarn-plugin-nixify/main/dist/yarn-plugin-nixify.js
+
+# Run Yarn as usual.
 yarn
+
+# Build your project with Nix.
 nix-build
 ```
 
@@ -33,12 +38,7 @@ Some examples of how to customize your build from within `default.nix`:
 let
 
   # Example of providing a different source.
-  src = fetchFromGitHub {
-    owner = "johndoe";
-    repo = "myproject";
-    rev = "v1.0.0";
-    sha256 = "1hdhafj726g45gh7nj8qv1xls8mps3vhzq3aasdymbdqcb1clhkz";
-  };
+  src = pkgs.lib.cleanSource ./.;
 
   project = pkgs.callPackage ./yarn-project.nix {
 
@@ -49,9 +49,12 @@ let
 
 in project.overrideAttrs (oldAttrs: {
 
+  # If your top-level package.json doesn't set a name, you can set one here.
+  name = "myproject";
+
   # Example of adding dependencies to the environment.
   # Native modules sometimes need these to build.
-  buildInputs = oldAttrs.buildInputs ++ [ python3 ];
+  buildInputs = oldAttrs.buildInputs ++ [ pkgs.python3 ];
 
   # Example of invoking a build step in your project.
   buildPhase = ''

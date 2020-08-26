@@ -36,6 +36,8 @@ in stdenv.mkDerivation {
   name = @@PROJECT_NAME@@;
   inherit src;
 
+  # Disable Nixify plugin to save on some unnecessary processing.
+  yarn_enable_nixify = "false";
   # Tell node-gyp to use the provided Node.js headers for native code builds.
   npm_config_nodedir = nodejs;
   # Tell node-pre-gyp to never fetch binaries / always build from source.

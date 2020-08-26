@@ -103,22 +103,26 @@ export default async (project: Project, cache: Cache, report: Report) => {
           .join(``) +
         `  ]`
     );
-  const projectExprPath = ppath.join(cwd, `yarn-project.nix` as Filename);
-  xfs.writeFileSync(projectExprPath, projectExpr);
+  xfs.writeFileSync(configuration.get(`nixExprPath`), projectExpr);
 
   // Create a wrapper if it does not exist yet.
-  const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
-  if (!xfs.existsSync(defaultExprPath)) {
-    xfs.writeFileSync(defaultExprPath, defaultExprTmpl);
-    report.reportInfo(
-      0,
-      `A minimal default.nix was created. You may want to customize it.`
-    );
+  if (configuration.get(`generateDefaultNix`)) {
+    const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
+    if (!xfs.existsSync(defaultExprPath)) {
+      xfs.writeFileSync(defaultExprPath, defaultExprTmpl);
+      report.reportInfo(
+        0,
+        `A minimal default.nix was created. You may want to customize it.`
+      );
+    }
   }
 
   // Preload the cache entries into the Nix store.
-  if (xfs.existsSync(npath.toPortablePath(`/nix/store`))) {
-    xfs.mktempPromise(async (tempDir) => {
+  if (
+    configuration.get(`enableNixPreload`) &&
+    xfs.existsSync(npath.toPortablePath(`/nix/store`))
+  ) {
+    await xfs.mktempPromise(async (tempDir) => {
       const toPreload: PortablePath[] = [];
       for (const { name, filename, sha512 } of cacheEntries) {
         // Check to see if the Nix store entry already exists.
