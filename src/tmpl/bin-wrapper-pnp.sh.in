@@ -1,2 +1,2 @@
 #!/bin/sh
-exec node -r '@@PNP_PATH@@' '@@SCRIPT_PATH@@' "$@"
+exec '@@NODE_PATH@@' -r '@@PNP_PATH@@' '@@SCRIPT_PATH@@' "$@"

@@ -60,14 +60,14 @@ export default class InstallBinCommand extends Command<CommandContext> {
           switch (nodeLinker) {
             case `pnp`:
               script = binWrapperPnpTmpl
+                .replace(`@@NODE_PATH@@`, process.execPath)
                 .replace(`@@PNP_PATH@@`, pnpPath)
                 .replace(`@@SCRIPT_PATH@@`, scriptPath);
               break;
             case `node-modules`:
-              script = binWrapperNodeModulesTmpl.replace(
-                `@@SCRIPT_PATH@@`,
-                scriptPath
-              );
+              script = binWrapperNodeModulesTmpl
+                .replace(`@@NODE_PATH@@`, process.execPath)
+                .replace(`@@SCRIPT_PATH@@`, scriptPath);
               break;
             default:
               throw Error(`Invalid nodeLinker ${nodeLinker}`);
