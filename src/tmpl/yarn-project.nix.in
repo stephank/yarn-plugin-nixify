@@ -57,7 +57,6 @@ in stdenv.mkDerivation {
     runHook preConfigure
 
     # Copy over the Yarn cache.
-    # TODO: Can we do without the copy somehow? Links don't work.
     rm -fr '${cacheFolder}'
     mkdir -p '${cacheFolder}'
     pushd '${cacheFolder}' > /dev/null
