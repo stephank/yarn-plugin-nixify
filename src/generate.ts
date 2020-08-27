@@ -12,6 +12,7 @@ import {
 
 import defaultExprTmpl from "./tmpl/default.nix.in";
 import projectExprTmpl from "./tmpl/yarn-project.nix.in";
+import { tmpdir } from "os";
 
 interface CacheEntry {
   name: string;
@@ -31,10 +32,24 @@ const cacheEntryToNix = (entry: CacheEntry) =>
 // Generator function that runs after `yarn install`.
 export default async (project: Project, cache: Cache, report: Report) => {
   const { configuration, cwd } = project;
-  const yarnPathAbs = configuration.get(`yarnPath`);
-  const cacheFolderAbs = configuration.get(`cacheFolder`);
+
+  // This case happens with `yarn dlx`, for example, and may cause errors if
+  // special settings don't apply to those installations. (Like a `nixExprPath`
+  // with a subdir that doesn't exist in the temporary project.)
+  //
+  // On macOS at least, we also need to get the real path of the OS temp dir,
+  // because it goes through a symlink.
+  const tempDir = xfs.realpathSync(npath.toPortablePath(tmpdir()));
+  if (project.cwd.startsWith(tempDir)) {
+    report.reportInfo(
+      0,
+      `Skipping Nixify, because ${project.cwd} appears to be a temporary directory`
+    );
+    return;
+  }
 
   // Sanity checks.
+  const yarnPathAbs = configuration.get(`yarnPath`);
   let yarnPath = ppath.relative(cwd, yarnPathAbs);
   if (yarnPath.startsWith(`../`)) {
     yarnPath = yarnPathAbs;
@@ -44,6 +59,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
     );
   }
 
+  const cacheFolderAbs = configuration.get(`cacheFolder`);
   let cacheFolder = ppath.relative(cwd, cacheFolderAbs);
   if (cacheFolder.startsWith(`../`)) {
     cacheFolder = cacheFolderAbs;
