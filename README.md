@@ -1,6 +1,6 @@
 # yarn-plugin-nixify
 
-Generates a Nix expression to build a [Yarn] v2 project (not using
+Generates a [Nix] expression to build a [Yarn] v2 project (not using
 zero-install).
 
 - Provides a build environment where a `yarn` shell alias is readily available
