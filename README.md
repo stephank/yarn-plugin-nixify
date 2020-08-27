@@ -18,8 +18,8 @@ zero-install).
 - Preloading of your Yarn cache into the Nix store, speeding up local
   `nix-build`.
 
-- _No Nix installation required_ for the plugin itself, so it should be safe to
-  add to your project even if some developers don't use Nix.
+- **No Nix installation required** for the plugin itself, so it should be safe
+  to add to your project even if some developers don't use Nix.
 
 [nix]: https://nixos.org
 [yarn]: https://yarnpkg.com
@@ -37,13 +37,13 @@ yarn set version from sources
 To then use the Nixify plugin:
 
 ```sh
-# Install the plugin.
+# Install the plugin
 yarn plugin import https://raw.githubusercontent.com/stephank/yarn-plugin-nixify/main/dist/yarn-plugin-nixify.js
 
-# Run Yarn as usual.
+# Run Yarn as usual
 yarn
 
-# Build your project with Nix.
+# Build your project with Nix
 nix-build
 ```
 
@@ -106,7 +106,7 @@ Some additional settings are available in `.yarnrc.yml`:
 - `enableNixPreload` can be set to `false` to disable preloading Yarn cache
   into the Nix store. This preloading is intended to speed up local
   `nix-build`, because Nix will not have to download dependencies again.
-  Preloading does mean another copy of dependencies on disk even if you don't
+  Preloading does mean another copy of dependencies on disk, even if you don't
   do local Nix builds, but the size is usually not an issue on modern disks.
 
 [niv]: https://github.com/nmattia/niv
