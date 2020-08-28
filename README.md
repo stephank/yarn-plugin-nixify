@@ -3,11 +3,11 @@
 Generates a [Nix] expression to build a [Yarn] v2 project (not using
 zero-install).
 
-- Provides a build environment where a `yarn` shell alias is readily available
-  — no global Yarn v1 install needed.
+- Provides a `yarn` shell alias in the Nix builder — no global Yarn v1 install
+  needed.
 
-- A default configure-phase that runs `yarn` in your project. (Should be enough
-  for plain JavaScript projects.)
+- A default configure-phase that runs `yarn` in your project. (May be all
+  that's needed for plain JavaScript projects.)
 
 - A default install-phase that creates executables for you based on `"bin"` in
   your `package.json`, making your package readily installable.
@@ -55,16 +55,16 @@ Running `yarn` with this plugin enabled will generate two files:
 - `default.nix`: Only generated if it does not exist yet. This file is intended
   to be customized with any project-specific logic you need.
 
-This should already build successfully! But if your project needs extra build
-steps, you may have to customize `default.nix` a bit. Some examples of what's
-possible:
+This may already build successfully! But if your project needs extra build
+steps or native dependencies, you may have to customize `default.nix` a bit.
+Some examples of what's possible:
 
 ```nix
 { pkgs ? import <nixpkgs> { } }:
 
 let
 
-  # Example of providing a different source.
+  # Example of providing a different source tree.
   src = pkgs.lib.cleanSource ./.;
 
   project = pkgs.callPackage ./yarn-project.nix {
@@ -79,8 +79,8 @@ in project.overrideAttrs (oldAttrs: {
   # If your top-level package.json doesn't set a name, you can set one here.
   name = "myproject";
 
-  # Example of adding dependencies to the environment.
-  # Native modules sometimes need these to build.
+  # Example of adding native dependencies to the environment.
+  # Especially dependencies with native modules may need a Python installation.
   buildInputs = oldAttrs.buildInputs ++ [ pkgs.python3 ];
 
   # Example of invoking a build step in your project.
@@ -104,7 +104,7 @@ Some additional settings are available in `.yarnrc.yml`:
   flag can be useful if you don't want a `default.nix` at all.
 
 - `enableNixPreload` can be set to `false` to disable preloading Yarn cache
-  into the Nix store. This preloading is intended to speed up local
+  into the Nix store. This preloading is intended to speed up a local
   `nix-build`, because Nix will not have to download dependencies again.
   Preloading does mean another copy of dependencies on disk, even if you don't
   do local Nix builds, but the size is usually not an issue on modern disks.
