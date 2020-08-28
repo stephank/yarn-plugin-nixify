@@ -28,7 +28,7 @@ zero-install).
 
 **This plugin currently depends on Yarn v2 master.**
 
-To get a compatible version, you currently need to install Yarn as follows:
+To get a compatible version, run the following in your project folder:
 
 ```sh
 yarn set version from sources
