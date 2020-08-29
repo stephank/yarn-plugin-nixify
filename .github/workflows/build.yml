@@ -37,3 +37,18 @@ jobs:
           echo "Build in dist/ is outdated"
           exit 1
         fi
+
+    - name: Install plugin
+      run: yarn plugin import ./dist/yarn-plugin-nixify.js
+
+    - name: Test without Nix
+      run: yarn
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v10
+
+    - name: Test with Nix
+      run: yarn
+
+    - name: Test nix-build
+      run: nix-build
