@@ -1,12 +1,17 @@
 {
   "compilerOptions": {
-    "experimentalDecorators": true,
     "module": "commonjs",
     "target": "es2018",
     "lib": ["es2018"],
     "types": ["node"],
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"]
 }
