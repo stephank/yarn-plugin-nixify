@@ -18,6 +18,9 @@ zero-install).
 - Preloading of your Yarn cache into the Nix store, speeding up local
   `nix-build`.
 
+- Automatically keeps your Nix expression up-to-date as you `yarn add` /
+  `yarn remove` dependencies.
+
 - **No Nix installation required** for the plugin itself, so it should be safe
   to add to your project even if some developers don't use Nix.
 
@@ -26,12 +29,15 @@ zero-install).
 
 ## Usage
 
-**This plugin currently depends on Yarn v2 master.**
-
-To get a compatible version, run the following in your project folder:
+The minimum version of Yarn is 2.2.0. Run the following in your project folder
+to check:
 
 ```sh
-yarn set version from sources
+# Check your Yarn version
+yarn --version
+
+# Upgrade to the latest version, if necessary
+yarn set version berry
 ```
 
 To then use the Nixify plugin:
