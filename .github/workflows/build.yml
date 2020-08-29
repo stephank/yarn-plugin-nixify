@@ -1,0 +1,38 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: 10.x
+
+    - uses: actions/cache@v2
+      with:
+        path: .yarn/cache
+        key: yarn-${{ hashFiles('yarn.lock') }}
+        restore-keys: yarn-
+
+    - name: Yarn install
+      run: yarn install --immutable
+
+    - name: TypeScript
+      run: yarn check
+
+    - name: Build
+      run: yarn build
+
+    - name: Check dist
+      run: |
+        if [[ "$(git status --porcelain)" != "" ]]; then
+          echo "Build in dist/ is outdated"
+          exit 1
+        fi
