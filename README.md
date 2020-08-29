@@ -85,7 +85,7 @@ in project.overrideAttrs (oldAttrs: {
   # If your top-level package.json doesn't set a name, you can set one here.
   name = "myproject";
 
-  # Example of adding native dependencies to the environment.
+  # Example of adding packages to the build environment.
   # Especially dependencies with native modules may need a Python installation.
   buildInputs = oldAttrs.buildInputs ++ [ pkgs.python3 ];
 
