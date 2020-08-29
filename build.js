@@ -38,9 +38,13 @@ const compiler = webpack({
     extensions: [`.mjs`, `.js`, `.ts`, `.tsx`, `.json`],
   },
 
-  externals: Object.fromEntries(
-    EXTERNALS.map((name) => [name, `commonjs ${name}`])
-  ),
+  externals: (() => {
+    const res = {};
+    for (const name of EXTERNALS) {
+      res[name] = `commonjs ${name}`;
+    }
+    return res;
+  })(),
 
   module: {
     rules: [

@@ -15,7 +15,8 @@ jobs:
       with:
         node-version: 10.x
 
-    - uses: actions/cache@v2
+    - name: Yarn cache
+      uses: actions/cache@v2
       with:
         path: .yarn/cache
         key: yarn-${{ hashFiles('yarn.lock') }}
