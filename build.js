@@ -8,7 +8,6 @@ const { RawSource } = require(`webpack-sources`);
 
 const IS_PROD = process.argv[2] === `-p`;
 const EXTERNALS = [
-  `@yarnpkg/cli`,
   `@yarnpkg/core`,
   `@yarnpkg/fslib`,
   `@yarnpkg/plugin-pnp`,
