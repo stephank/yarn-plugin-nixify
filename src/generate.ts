@@ -147,9 +147,17 @@ export default async (project: Project, cache: Cache, report: Report) => {
         if (!xfs.existsSync(storePath)) {
           // The nix-store command requires a correct filename on disk, so we
           // prepare a temporary directory containing all the files to preload.
+          //
+          // Because some names may conflict (e.g. 'typescript-npm-xyz' and
+          // 'typescript-patch-xyz' both have the same derivation name), we
+          // create subdirectories based on hash.
+          const subdir = ppath.join(tempDir, sha512.slice(0, 7) as Filename);
+          await xfs.mkdirPromise(subdir);
+
           const src = ppath.join(cache.cwd, filename);
-          const dst = ppath.join(tempDir, name as Filename);
+          const dst = ppath.join(subdir, name as Filename);
           await xfs.copyFilePromise(src, dst);
+
           toPreload.push(dst);
         }
       }
