@@ -27,6 +27,18 @@ zero-install).
 [nix]: https://nixos.org
 [yarn]: https://yarnpkg.com
 
+Related projects:
+
+- [node2nix], [yarn2nix]: Both do a similar job, but as separate commands. By
+  comparison, this plugin tries to automate the process and make things easy
+  for Nix and non-Nix devs alike.
+
+- [composer-plugin-nixify]: Similar solution for PHP with Composer.
+
+[node2nix]: https://github.com/svanderburg/node2nix
+[yarn2nix]: https://github.com/nix-community/yarn2nix/
+[composer-plugin-nixify]: https://github.com/stephank/composer-plugin-nixify
+
 ## Usage
 
 The minimum version of Yarn is 2.2.0. Run the following in your project folder
