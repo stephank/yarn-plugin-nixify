@@ -94,4 +94,8 @@ in stdenv.mkDerivation {
 
     runHook postInstall
   '';
+
+  passthru = {
+    inherit nodejs;
+  };
 }
