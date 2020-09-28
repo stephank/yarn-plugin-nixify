@@ -1,2 +1,3 @@
 #!/bin/sh
-exec '@@NODE_PATH@@' -r '@@PNP_PATH@@' '@@SCRIPT_PATH@@' "$@"
+export NODE_OPTIONS="--require @@PNP_PATH@@"
+exec '@@NODE_PATH@@' '@@SCRIPT_PATH@@' "$@"
