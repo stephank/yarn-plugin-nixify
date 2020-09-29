@@ -52,3 +52,5 @@ jobs:
 
     - name: Test nix-build
       run: nix-build
+      env:
+        NIX_PATH: nixpkgs=channel:nixpkgs-unstable
