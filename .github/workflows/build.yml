@@ -45,11 +45,11 @@ jobs:
       run: yarn
 
     - name: Install Nix
-      uses: nixbuild/nix-quick-install-action@v3
+      uses: nixbuild/nix-quick-install-action@v4
 
     - name: Setup Cachix
       if: github.event_name == 'push' && github.repository_owner == 'stephank'
-      uses: cachix/cachix-action@v6
+      uses: cachix/cachix-action@v8
       with:
         name: stephank
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
