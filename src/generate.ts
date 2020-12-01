@@ -124,7 +124,8 @@ export default async (project: Project, cache: Cache, report: Report) => {
   // Create a wrapper if it does not exist yet.
   if (configuration.get(`generateDefaultNix`)) {
     const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
-    if (!xfs.existsSync(defaultExprPath)) {
+    const flakeExprPath = ppath.join(cwd, `flake.nix` as Filename);
+    if (!xfs.existsSync(defaultExprPath) && !xfs.existsSync(flakeExprPath)) {
       xfs.writeFileSync(defaultExprPath, defaultExprTmpl);
       report.reportInfo(
         0,
