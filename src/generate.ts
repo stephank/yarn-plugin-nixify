@@ -116,6 +116,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
       `[\n` +
         cacheEntries
           .map((entry) => `    { ${cacheEntryToNix(entry)} }\n`)
+          .sort()
           .join(``) +
         `  ]`
     );
