@@ -2,6 +2,12 @@
   "name": "yarn-plugin-nixify",
   "version": "0.0.0",
   "main": "./src/index.ts",
+  "scripts": {
+    "check": "tsc",
+    "build": "./build.js -p",
+    "build-dev": "./build.js",
+    "fmt": "prettier --write src"
+  },
   "devDependencies": {
     "@babel/core": "^7.11.4",
     "@babel/plugin-proposal-class-properties": "^7.10.4",
@@ -20,10 +26,28 @@
     "webpack": "next",
     "webpack-sources": "^1.4.3"
   },
-  "scripts": {
-    "check": "tsc",
-    "build": "./build.js -p",
-    "build-dev": "./build.js",
-    "fmt": "prettier --write src"
+  "resolutions": {
+    "@yarnpkg/cli": "2.2.0",
+    "@yarnpkg/core": "2.2.0",
+    "@yarnpkg/fslib": "2.2.0",
+    "@yarnpkg/libzip": "2.2.0",
+    "@yarnpkg/parsers": "2.2.0",
+    "@yarnpkg/plugin-compat": "2.1.1",
+    "@yarnpkg/plugin-dlx": "2.1.1",
+    "@yarnpkg/plugin-essentials": "2.2.0",
+    "@yarnpkg/plugin-file": "2.2.0",
+    "@yarnpkg/plugin-git": "2.1.1",
+    "@yarnpkg/plugin-github": "2.1.1",
+    "@yarnpkg/plugin-http": "2.1.1",
+    "@yarnpkg/plugin-init": "2.1.1",
+    "@yarnpkg/plugin-link": "2.1.1",
+    "@yarnpkg/plugin-node-modules": "2.1.1",
+    "@yarnpkg/plugin-npm": "2.2.0",
+    "@yarnpkg/plugin-npm-cli": "2.1.1",
+    "@yarnpkg/plugin-pack": "2.2.0",
+    "@yarnpkg/plugin-patch": "2.1.1",
+    "@yarnpkg/plugin-pnp": "2.2.0",
+    "@yarnpkg/plugin-stage": "2.1.1",
+    "@yarnpkg/shell": "2.2.0"
   }
 }
