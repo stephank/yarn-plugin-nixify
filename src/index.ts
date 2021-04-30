@@ -1,10 +1,12 @@
-import FetchOneCommand from "./FetchOneCommand";
-import InstallBinCommand from "./InstallBinCommand";
-import generate from "./generate";
 import { Hooks, Plugin, SettingsType } from "@yarnpkg/core";
 
+import FetchOneCommand from "./FetchOneCommand";
+import InjectBuildCommand from "./InjectBuildCommand";
+import InstallBinCommand from "./InstallBinCommand";
+import generate from "./generate";
+
 const plugin: Plugin<Hooks> = {
-  commands: [FetchOneCommand, InstallBinCommand],
+  commands: [FetchOneCommand, InjectBuildCommand, InstallBinCommand],
   hooks: {
     afterAllInstalled: async (project, opts) => {
       if (
@@ -35,6 +37,12 @@ const plugin: Plugin<Hooks> = {
       description: `If true, cached packages will be preloaded into the Nix store`,
       type: SettingsType.BOOLEAN,
       default: true,
+    },
+    isolatedNixBuilds: {
+      description: `Dependencies with a build step that can be built in an isolated derivation`,
+      type: SettingsType.STRING,
+      default: [],
+      isArray: true,
     },
   },
 };

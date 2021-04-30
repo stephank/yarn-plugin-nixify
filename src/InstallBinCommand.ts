@@ -11,6 +11,7 @@ import {
 
 import binWrapperNodeModulesTmpl from "./tmpl/bin-wrapper-node-modules.sh.in";
 import binWrapperPnpTmpl from "./tmpl/bin-wrapper-pnp.sh.in";
+import { renderTmpl } from "./textUtils";
 
 const supportedLinkers = [`pnp`, `node-modules`];
 
@@ -59,22 +60,24 @@ export default class InstallBinCommand extends Command<CommandContext> {
           let script;
           switch (nodeLinker) {
             case `pnp`:
-              script = binWrapperPnpTmpl
-                .replace(`@@NODE_PATH@@`, process.execPath)
-                .replace(`@@PNP_PATH@@`, pnpPath)
-                .replace(`@@SCRIPT_PATH@@`, scriptPath);
+              script = renderTmpl(binWrapperPnpTmpl, {
+                NODE_PATH: process.execPath,
+                PNP_PATH: pnpPath,
+                SCRIPT_PATH: scriptPath,
+              });
               break;
             case `node-modules`:
-              script = binWrapperNodeModulesTmpl
-                .replace(`@@NODE_PATH@@`, process.execPath)
-                .replace(`@@SCRIPT_PATH@@`, scriptPath);
+              script = renderTmpl(binWrapperNodeModulesTmpl, {
+                NODE_PATH: process.execPath,
+                SCRIPT_PATH: scriptPath,
+              });
               break;
             default:
-              throw Error(`Invalid nodeLinker ${nodeLinker}`);
+              throw Error(`Assertion failed: Invalid nodeLinker ${nodeLinker}`);
           }
 
-          xfs.writeFileSync(binPath, script);
-          xfs.chmodSync(binPath, 0o755);
+          await xfs.writeFilePromise(binPath, script);
+          await xfs.chmodPromise(binPath, 0o755);
         }
       }
     );

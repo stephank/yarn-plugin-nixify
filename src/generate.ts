@@ -1,10 +1,17 @@
 import { Filename, npath, PortablePath, ppath, xfs } from "@yarnpkg/fslib";
-import { computeFixedOutputStorePath } from "./nixUtils";
+import { parseSyml } from "@yarnpkg/parsers";
+import { patchUtils } from "@yarnpkg/plugin-patch";
+import {
+  computeFixedOutputStorePath,
+  sanitizeDerivationName,
+} from "./nixUtils";
+import { json, indent, renderTmpl, upperCamelize } from "./textUtils";
 
 import {
   Cache,
   execUtils,
   LocatorHash,
+  Package,
   Project,
   Report,
   structUtils,
@@ -13,21 +20,6 @@ import {
 import defaultExprTmpl from "./tmpl/default.nix.in";
 import projectExprTmpl from "./tmpl/yarn-project.nix.in";
 import { tmpdir } from "os";
-
-interface CacheEntry {
-  name: string;
-  filename: Filename;
-  sha512: string;
-  locatorHash: LocatorHash;
-}
-
-const cacheEntryToNix = (entry: CacheEntry) =>
-  [
-    `name = ${JSON.stringify(entry.name)};`,
-    `filename = ${JSON.stringify(entry.filename)};`,
-    `sha512 = ${JSON.stringify(entry.sha512)};`,
-    `locatorHash = ${JSON.stringify(entry.locatorHash)};`,
-  ].join(` `);
 
 // Generator function that runs after `yarn install`.
 export default async (project: Project, cache: Cache, report: Report) => {
@@ -39,7 +31,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
   //
   // On macOS at least, we also need to get the real path of the OS temp dir,
   // because it goes through a symlink.
-  const tempDir = xfs.realpathSync(npath.toPortablePath(tmpdir()));
+  const tempDir = await xfs.realpathPromise(npath.toPortablePath(tmpdir()));
   if (project.cwd.startsWith(tempDir)) {
     report.reportInfo(
       0,
@@ -81,11 +73,26 @@ export default async (project: Project, cache: Cache, report: Report) => {
     }
   }
 
+  // Determine relative paths for Nix path literals.
+  const nixExprPath = configuration.get(`nixExprPath`);
+  const lockfileFilename = configuration.get(`lockfileFilename`);
+  const lockfileRel = ppath.relative(
+    ppath.dirname(nixExprPath),
+    lockfileFilename
+  );
+  const yarnPathRel = ppath.relative(ppath.dirname(nixExprPath), yarnPath);
+
   // Build a list of cache entries so Nix can fetch them.
-  let cacheEntries: CacheEntry[] = [];
-  const cacheFiles = new Set(xfs.readdirSync(cache.cwd));
+  // TODO: See if we can use Nix fetchurl for npm: dependencies.
+  interface CacheEntry {
+    filename: Filename;
+    sha512: string;
+  }
+  const cacheEntries: Map<string, CacheEntry> = new Map();
+
+  const cacheFiles = new Set(await xfs.readdirPromise(cache.cwd));
   for (const pkg of project.storedPackages.values()) {
-    const { version, locatorHash } = pkg;
+    const { locatorHash } = pkg;
     const checksum = project.storedChecksums.get(locatorHash);
     if (!checksum) continue;
 
@@ -95,39 +102,192 @@ export default async (project: Project, cache: Cache, report: Report) => {
     const filename = ppath.basename(cachePath);
     if (!cacheFiles.has(filename)) continue;
 
-    let name = structUtils.slugifyIdent(pkg).replace(/^@/, "_at_");
-    if (version) {
-      name += `-${version}`;
+    const locatorStr = structUtils.stringifyLocator(pkg);
+    const sha512 = checksum.split(`/`).pop()!;
+    cacheEntries.set(locatorStr, { filename, sha512 });
+  }
+
+  let cacheEntriesCode = `cacheEntries = {\n`;
+  for (const [locatorStr, entry] of cacheEntries) {
+    cacheEntriesCode += `${json(locatorStr)} = { ${[
+      `filename = ${json(entry.filename)};`,
+      `sha512 = ${json(entry.sha512)};`,
+    ].join(` `)} };\n`;
+  }
+  cacheEntriesCode += `};`;
+
+  // Generate Nix code for isolated builds.
+  const isolatedBuilds: string[] = configuration.get(`isolatedNixBuilds`);
+  let isolatedPackages = new Set<Package>();
+  let isolatedIntegration = [];
+  let isolatedCode = [];
+
+  const nodeLinker = configuration.get(`nodeLinker`);
+  const pnpUnpluggedFolder = configuration.get(`pnpUnpluggedFolder`);
+  const bstatePath: PortablePath = configuration.get(`bstatePath`);
+  const bstate: { [key: string]: string } = xfs.existsSync(bstatePath)
+    ? parseSyml(await xfs.readFilePromise(bstatePath, `utf8`))
+    : {};
+
+  const collectTree = (pkg: Package, out: Set<string> = new Set()) => {
+    const locatorStr = structUtils.stringifyLocator(pkg);
+    if (cacheEntries.has(locatorStr)) {
+      out.add(locatorStr);
     }
 
-    const sha512 = checksum.split(`/`).pop()!;
-    cacheEntries.push({ name, filename, sha512, locatorHash });
+    if (structUtils.isVirtualLocator(pkg)) {
+      const devirtPkg = project.storedPackages.get(
+        structUtils.devirtualizeLocator(pkg).locatorHash
+      );
+      if (!devirtPkg) {
+        throw Error(
+          `Assertion failed: The locator should have been registered`
+        );
+      }
+
+      collectTree(devirtPkg, out);
+    }
+
+    if (pkg.reference.startsWith("patch:")) {
+      const depatchPkg = project.storedPackages.get(
+        patchUtils.parseLocator(pkg).sourceLocator.locatorHash
+      );
+      if (!depatchPkg) {
+        throw Error(
+          `Assertion failed: The locator should have been registered`
+        );
+      }
+
+      collectTree(depatchPkg, out);
+    }
+
+    for (const dependency of pkg.dependencies.values()) {
+      const resolution = project.storedResolutions.get(
+        dependency.descriptorHash
+      );
+      if (!resolution) {
+        throw Error(
+          "Assertion failed: The descriptor should have been registered"
+        );
+      }
+
+      const depPkg = project.storedPackages.get(resolution);
+      if (!depPkg) {
+        throw Error(
+          `Assertion failed: The locator should have been registered`
+        );
+      }
+
+      collectTree(depPkg, out);
+    }
+
+    return out;
+  };
+
+  for (const locatorHash of Object.keys(bstate)) {
+    const pkg = project.storedPackages.get(locatorHash as LocatorHash);
+    if (!pkg) {
+      throw Error(`Assertion failed: The locator should have been registered`);
+    }
+
+    // TODO: Better options for matching.
+    if (!isolatedBuilds.includes(pkg.name)) {
+      continue;
+    }
+
+    // TODO: We can't currently support the node-modules linker, because it
+    // always clears build state.
+    let installLocation: PortablePath;
+    switch (nodeLinker) {
+      case `pnp`:
+        installLocation = ppath.relative(
+          project.cwd,
+          ppath.join(
+            pnpUnpluggedFolder,
+            structUtils.slugifyLocator(pkg),
+            structUtils.getIdentVendorPath(pkg)
+          )
+        );
+        break;
+      default:
+        throw Error(
+          `The nodeLinker ${nodeLinker} is not supported for isolated Nix builds`
+        );
+    }
+
+    // Virtualization typically happens when the package has peer dependencies,
+    // and thus it depends on context how the package is built. But we
+    // eliminate that context, so devirtualize.
+    let devirtPkg = pkg;
+    if (structUtils.isVirtualLocator(devirtPkg)) {
+      const { locatorHash } = structUtils.devirtualizeLocator(devirtPkg);
+      const pkg = project.storedPackages.get(locatorHash);
+      if (!pkg) {
+        throw Error(
+          `Assertion failed: The locator should have been registered`
+        );
+      }
+      devirtPkg = pkg;
+    }
+
+    const buildLocatorStr = structUtils.stringifyLocator(devirtPkg);
+    const injectLocatorStr = structUtils.stringifyLocator(pkg);
+    const isolatedProp = `isolated.${json(buildLocatorStr)}`;
+
+    if (!isolatedPackages.has(devirtPkg)) {
+      isolatedPackages.add(devirtPkg);
+
+      const locators = [...collectTree(pkg)]
+        .sort()
+        .map((v) => `${json(v)}\n`)
+        .join(``);
+
+      const overrideArg = `override${upperCamelize(pkg.name)}Attrs`;
+      isolatedCode.push(
+        `${isolatedProp} = optionalOverride (args.${overrideArg} or null) (mkIsolatedBuild { ${[
+          `pname = ${json(pkg.name)};`,
+          `version = ${json(pkg.version)};`,
+          `locators = [\n${locators}];`,
+        ].join(` `)} });`
+      );
+    }
+
+    if (isolatedIntegration.length === 0) {
+      isolatedIntegration.push("# Copy in isolated builds.");
+    }
+    isolatedIntegration.push(
+      `echo 'injecting build for ${pkg.name}'`,
+      `yarn nixify inject-build \\`,
+      `  ${json(injectLocatorStr)} \\`,
+      `  $\{${isolatedProp}} \\`,
+      `  ${json(installLocation)}`
+    );
+  }
+  if (isolatedIntegration.length > 0) {
+    isolatedIntegration.push(`echo 'running yarn install'`);
   }
 
   // Render the Nix expression.
   const ident = project.topLevelWorkspace.manifest.name;
   const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
-  const projectExpr = projectExprTmpl
-    .replace(`@@PROJECT_NAME@@`, JSON.stringify(projectName))
-    .replace(`@@YARN_PATH@@`, JSON.stringify(yarnPath))
-    .replace(`@@CACHE_FOLDER@@`, JSON.stringify(cacheFolder))
-    .replace(
-      `@@CACHE_ENTRIES@@`,
-      `[\n` +
-        cacheEntries
-          .map((entry) => `    { ${cacheEntryToNix(entry)} }\n`)
-          .sort()
-          .join(``) +
-        `  ]`
-    );
-  xfs.writeFileSync(configuration.get(`nixExprPath`), projectExpr);
+  const projectExpr = renderTmpl(projectExprTmpl, {
+    PROJECT_NAME: json(projectName),
+    YARN_PATH: yarnPathRel,
+    LOCKFILE: lockfileRel,
+    CACHE_FOLDER: json(cacheFolder),
+    CACHE_ENTRIES: cacheEntriesCode,
+    ISOLATED: isolatedCode.join("\n"),
+    ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),
+    NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
+  });
+  await xfs.writeFilePromise(configuration.get(`nixExprPath`), projectExpr);
 
   // Create a wrapper if it does not exist yet.
   if (configuration.get(`generateDefaultNix`)) {
     const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
     const flakeExprPath = ppath.join(cwd, `flake.nix` as Filename);
     if (!xfs.existsSync(defaultExprPath) && !xfs.existsSync(flakeExprPath)) {
-      xfs.writeFileSync(defaultExprPath, defaultExprTmpl);
+      await xfs.writeFilePromise(defaultExprPath, defaultExprTmpl);
       report.reportInfo(
         0,
         `A minimal default.nix was created. You may want to customize it.`
@@ -142,7 +302,8 @@ export default async (project: Project, cache: Cache, report: Report) => {
   ) {
     await xfs.mktempPromise(async (tempDir) => {
       const toPreload: PortablePath[] = [];
-      for (const { name, filename, sha512 } of cacheEntries) {
+      for (const [locator, { filename, sha512 }] of cacheEntries.entries()) {
+        const name = sanitizeDerivationName(locator);
         // Check to see if the Nix store entry already exists.
         const hash = Buffer.from(sha512, "hex");
         const storePath = computeFixedOutputStorePath(name, `sha512`, hash);

@@ -3,4 +3,4 @@
 
 { pkgs ? import <nixpkgs> { } }:
 
-pkgs.callPackage ./yarn-project.nix { } ./.
+pkgs.callPackage ./yarn-project.nix { } { src = ./.; }

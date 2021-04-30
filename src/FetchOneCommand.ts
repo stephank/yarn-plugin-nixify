@@ -4,16 +4,16 @@ import {
   Cache,
   CommandContext,
   Configuration,
-  LocatorHash,
   Project,
   StreamReport,
+  structUtils,
 } from "@yarnpkg/core";
 
 // Internal command that fetches a single locator.
 // Used from within Nix to build the cache for the project.
 export default class FetchOneCommand extends Command<CommandContext> {
   @Command.String()
-  locatorHash: string = ``;
+  locator: string = ``;
 
   @Command.Path(`nixify`, `fetch-one`)
   async execute() {
@@ -29,11 +29,10 @@ export default class FetchOneCommand extends Command<CommandContext> {
     const report = await StreamReport.start(
       { configuration, stdout: this.context.stdout },
       async (report) => {
-        const pkg = project.originalPackages.get(
-          this.locatorHash as LocatorHash
-        );
+        const { locatorHash } = structUtils.parseLocator(this.locator, true);
+        const pkg = project.originalPackages.get(locatorHash);
         if (!pkg) {
-          report.reportError(0, `Invalid locator hash`);
+          report.reportError(0, `Invalid locator`);
           return;
         }
 

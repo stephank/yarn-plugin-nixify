@@ -82,15 +82,17 @@ Some examples of what's possible:
 
 let
 
-  # Example of providing a different source tree.
-  src = pkgs.lib.cleanSource ./.;
-
   project = pkgs.callPackage ./yarn-project.nix {
 
     # Example of selecting a specific version of Node.js.
     nodejs = pkgs.nodejs-14_x;
 
-  } src;
+  } {
+
+    # Example of providing a different source tree.
+    src = pkgs.lib.cleanSource ./.;
+
+  }
 
 in project.overrideAttrs (oldAttrs: {
 

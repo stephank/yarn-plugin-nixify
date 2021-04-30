@@ -60,3 +60,14 @@ export const computeFixedOutputStorePath = (
 
   return ppath.join(storePath, `${outerHash32}-${name}` as Filename);
 };
+
+/**
+ * Creates a valid derivation name from a potentially invalid one.
+ *
+ * Matches lib.strings.sanitizeDerivationName in Nixpkgs.
+ */
+export const sanitizeDerivationName = (name: string) =>
+  name
+    .replace(/^\.+/, "")
+    .replace(/[^a-zA-Z0-9+._?=-]+/g, "-")
+    .slice(0, 207) || "unknown";
