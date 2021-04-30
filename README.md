@@ -1,5 +1,7 @@
 # yarn-plugin-nixify
 
+**Upgrading the plugin? See [UPGRADING.md](./UPGRADING.md)**
+
 Generates a [Nix] expression to build a [Yarn] v2 project (not using
 zero-install).
 
@@ -128,6 +130,8 @@ Some additional settings are available in `.yarnrc.yml`:
   `nix-build`, because Nix will not have to download dependencies again.
   Preloading does mean another copy of dependencies on disk, even if you don't
   do local Nix builds, but the size is usually not an issue on modern disks.
+
+- `isolatedNixBuilds`, see [ISOLATED_BUILDS.md](./ISOLATED_BUILDS.md).
 
 [niv]: https://github.com/nmattia/niv
 
