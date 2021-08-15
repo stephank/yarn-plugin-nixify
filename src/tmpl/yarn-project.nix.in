@@ -75,6 +75,8 @@ let
 
       echo '{ "dependencies": { "${pname}": "${version}" } }' > package.json
       install -m 0600 ${lockfile} ./yarn.lock
+      export yarn_global_folder="$TMP"
+      export YARN_ENABLE_IMMUTABLE_INSTALLS=false
       yarn --immutable-cache
     '';
 
@@ -106,6 +108,9 @@ let
       pushd '${cacheFolder}' > /dev/null
       source ${mkCacheBuilderForDrvs (lib.attrValues cacheDrvs)}
       popd > /dev/null
+
+      # Yarn may need a writable home directory.
+      export yarn_global_folder="$TMP"
 
 @@ISOLATED_INTEGRATION@@
 

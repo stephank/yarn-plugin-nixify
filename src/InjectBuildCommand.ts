@@ -1,4 +1,4 @@
-import { Command } from "clipanion";
+import { Command, Option } from "clipanion";
 import { PortablePath, ppath, xfs } from "@yarnpkg/fslib";
 import { createHash } from "crypto";
 import { parseSyml, stringifySyml } from "@yarnpkg/parsers";
@@ -16,14 +16,11 @@ import {
 
 // Internal command that injects an isolated build inside a Nix build.
 export default class InjectBuildCommand extends Command<CommandContext> {
-  @Command.String()
-  locator: string = ``;
-  @Command.String()
-  source: string = ``;
-  @Command.String()
-  installLocation: string = ``;
+  static paths = [[`nixify`, `inject-build`]];
+  locator = Option.String();
+  source = Option.String();
+  installLocation = Option.String();
 
-  @Command.Path(`nixify`, `inject-build`)
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,
@@ -132,12 +129,8 @@ export default class InjectBuildCommand extends Command<CommandContext> {
 
         // Update build state. The way we do this is crude, but we run
         // `yarn install` later, which should clean it up again.
-        const bstatePath: PortablePath = configuration.get(`bstatePath`);
-        const bstate: { [key: string]: string } = xfs.existsSync(bstatePath)
-          ? parseSyml(await xfs.readFilePromise(bstatePath, `utf8`))
-          : {};
-        bstate[pkg.locatorHash] = buildHash;
-        await xfs.writeFilePromise(bstatePath, stringifySyml(bstate));
+        project.storedBuildState.set(pkg.locatorHash, buildHash);
+        await project.persistInstallStateFile();
       }
     );
 

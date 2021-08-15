@@ -1,4 +1,4 @@
-import { Command } from "clipanion";
+import { Command, Option } from "clipanion";
 
 import {
   Cache,
@@ -12,10 +12,9 @@ import {
 // Internal command that fetches a single locator.
 // Used from within Nix to build the cache for the project.
 export default class FetchOneCommand extends Command<CommandContext> {
-  @Command.String()
-  locator: string = ``;
+  static paths = [[`nixify`, `fetch-one`]];
+  locator = Option.String();
 
-  @Command.Path(`nixify`, `fetch-one`)
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,

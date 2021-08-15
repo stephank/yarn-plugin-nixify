@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NIX_PATH: nixpkgs=channel:nixpkgs-unstable
     steps:
 
     - name: Checkout
@@ -13,7 +15,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v1
       with:
-        node-version: 10.x
+        node-version: 12.x
 
     - name: Yarn cache
       uses: actions/cache@v2
@@ -59,5 +61,24 @@ jobs:
 
     - name: Test nix-build
       run: nix-build
-      env:
-        NIX_PATH: nixpkgs=channel:nixpkgs-unstable
+
+    # TODO: Check there really is a separate derivation,
+    # and that Yarn actually reuses the build.
+    - name: Test isolated builds
+      run: |
+        # Matches example in  ISOLATED_BUILDS.md
+        echo 'isolatedNixBuilds: ["sqlite3"]' >> .yarnrc.yml
+        cat > default.nix << EOF
+        { pkgs ? import <nixpkgs> { } }:
+
+        pkgs.callPackage ./yarn-project.nix { } {
+          src = ./.;
+          overrideSqlite3Attrs = old: {
+            npm_config_sqlite = "/";  # Don't accidentally use the wrong sqlite.
+            buildInputs = old.buildInputs ++ (with pkgs; [ python3 sqlite ]);
+          };
+        }
+        EOF
+
+        yarn add sqlite3
+        nix-build

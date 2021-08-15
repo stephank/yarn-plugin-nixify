@@ -2,7 +2,7 @@
 
 **Upgrading the plugin? See [UPGRADING.md](./UPGRADING.md)**
 
-Generates a [Nix] expression to build a [Yarn] v2 project (not using
+Generates a [Nix] expression to build a [Yarn] v3 project (not using
 zero-install).
 
 - Provides a `yarn` shell alias in the Nix builder — no global Yarn v1 install
@@ -43,7 +43,7 @@ Related projects:
 
 ## Usage
 
-The minimum version of Yarn is 2.2.0. Run the following in your project folder
+The minimum version of Yarn is 3.0.0. Run the following in your project folder
 to check:
 
 ```sh

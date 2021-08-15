@@ -117,17 +117,13 @@ export default async (project: Project, cache: Cache, report: Report) => {
   cacheEntriesCode += `};`;
 
   // Generate Nix code for isolated builds.
-  const isolatedBuilds: string[] = configuration.get(`isolatedNixBuilds`);
+  const isolatedBuilds = configuration.get(`isolatedNixBuilds`);
   let isolatedPackages = new Set<Package>();
   let isolatedIntegration = [];
   let isolatedCode = [];
 
   const nodeLinker = configuration.get(`nodeLinker`);
   const pnpUnpluggedFolder = configuration.get(`pnpUnpluggedFolder`);
-  const bstatePath: PortablePath = configuration.get(`bstatePath`);
-  const bstate: { [key: string]: string } = xfs.existsSync(bstatePath)
-    ? parseSyml(await xfs.readFilePromise(bstatePath, `utf8`))
-    : {};
 
   const collectTree = (pkg: Package, out: Set<string> = new Set()) => {
     const locatorStr = structUtils.stringifyLocator(pkg);
@@ -184,7 +180,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
     return out;
   };
 
-  for (const locatorHash of Object.keys(bstate)) {
+  for (const locatorHash of project.storedBuildState.keys()) {
     const pkg = project.storedPackages.get(locatorHash as LocatorHash);
     if (!pkg) {
       throw Error(`Assertion failed: The locator should have been registered`);

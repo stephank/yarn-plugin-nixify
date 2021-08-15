@@ -1,9 +1,20 @@
 import { Hooks, Plugin, SettingsType } from "@yarnpkg/core";
+import { PortablePath } from "@yarnpkg/fslib";
 
 import FetchOneCommand from "./FetchOneCommand";
 import InjectBuildCommand from "./InjectBuildCommand";
 import InstallBinCommand from "./InstallBinCommand";
 import generate from "./generate";
+
+declare module "@yarnpkg/core" {
+  interface ConfigurationValueMap {
+    enableNixify: boolean;
+    nixExprPath: PortablePath;
+    generateDefaultNix: boolean;
+    enableNixPreload: boolean;
+    isolatedNixBuilds: string[];
+  }
+}
 
 const plugin: Plugin<Hooks> = {
   commands: [FetchOneCommand, InjectBuildCommand, InstallBinCommand],

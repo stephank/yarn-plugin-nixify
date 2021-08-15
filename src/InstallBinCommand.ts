@@ -1,4 +1,4 @@
-import { Command } from "clipanion";
+import { Command, Option } from "clipanion";
 import { Filename, npath, ppath, xfs } from "@yarnpkg/fslib";
 import { getPnpPath } from "@yarnpkg/plugin-pnp";
 
@@ -18,10 +18,9 @@ const supportedLinkers = [`pnp`, `node-modules`];
 // Internal command that creates wrappers for binaries.
 // Used inside the Nix install phase.
 export default class InstallBinCommand extends Command<CommandContext> {
-  @Command.String()
-  binDir: string = ``;
+  static paths = [[`nixify`, `install-bin`]];
+  binDir = Option.String();
 
-  @Command.Path(`nixify`, `install-bin`)
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,
@@ -49,7 +48,7 @@ export default class InstallBinCommand extends Command<CommandContext> {
         }
 
         const binDir = npath.toPortablePath(this.binDir);
-        const pnpPath = getPnpPath(project).main;
+        const pnpPath = getPnpPath(project).cjs;
         for (const [name, scriptInput] of workspace.manifest.bin) {
           const binPath = ppath.join(binDir, name as Filename);
           const scriptPath = ppath.join(
