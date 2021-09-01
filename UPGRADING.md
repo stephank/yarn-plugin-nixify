@@ -15,7 +15,11 @@ yarn
 nix-build
 ```
 
-## Since 153254f (2021-04-30)
+## Since 2757cfd (merged 2021-08-01)
+
+- **BREAKING**: The plugin now requires Yarn v3.
+
+## Since 153254f (merged 2021-04-30)
 
 - **BREAKING**: The generated `yarn-project.nix` now takes an attribute set:
 
