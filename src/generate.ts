@@ -10,6 +10,7 @@ import { json, indent, renderTmpl, upperCamelize } from "./textUtils";
 import {
   Cache,
   execUtils,
+  hashUtils,
   LocatorHash,
   Package,
   Project,
@@ -91,19 +92,20 @@ export default async (project: Project, cache: Cache, report: Report) => {
   const cacheEntries: Map<string, CacheEntry> = new Map();
 
   const cacheFiles = new Set(await xfs.readdirPromise(cache.cwd));
+  const cacheOptions = { unstablePackages: project.conditionalLocators };
   for (const pkg of project.storedPackages.values()) {
     const { locatorHash } = pkg;
     const checksum = project.storedChecksums.get(locatorHash);
-    if (!checksum) continue;
-
-    const cachePath = cache.getLocatorPath(pkg, checksum);
+    const cachePath = cache.getLocatorPath(pkg, checksum || null, cacheOptions);
     if (!cachePath) continue;
 
     const filename = ppath.basename(cachePath);
     if (!cacheFiles.has(filename)) continue;
 
     const locatorStr = structUtils.stringifyLocator(pkg);
-    const sha512 = checksum.split(`/`).pop()!;
+    const sha512 = checksum
+      ? checksum.split(`/`).pop()!
+      : await hashUtils.checksumFile(cachePath);
     cacheEntries.set(locatorStr, { filename, sha512 });
   }
 
