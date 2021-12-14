@@ -15,6 +15,10 @@ yarn
 nix-build
 ```
 
+## Since 00b7adf (merged 2021-12-14)
+
+- **BREAKING**: The plugin now requires Yarn v3.1.
+
 ## Since 2757cfd (merged 2021-08-01)
 
 - **BREAKING**: The plugin now requires Yarn v3.
