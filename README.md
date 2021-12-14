@@ -43,7 +43,7 @@ Related projects:
 
 ## Usage
 
-The minimum version of Yarn is 3.0.0. Run the following in your project folder
+The minimum version of Yarn is 3.1.0. Run the following in your project folder
 to check:
 
 ```sh

@@ -343,7 +343,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
             `Preloaded ${numToPreload} packages into the Nix store`
           );
         }
-      } catch (err) {
+      } catch (err: any) {
         // Don't break if there appears to be no Nix installation after all.
         if (err.code !== "ENOENT") {
           throw err;
