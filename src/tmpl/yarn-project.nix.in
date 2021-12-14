@@ -77,7 +77,7 @@ let
       install -m 0600 ${lockfile} ./yarn.lock
       export yarn_global_folder="$TMP"
       export YARN_ENABLE_IMMUTABLE_INSTALLS=false
-      yarn
+      yarn --immutable-cache
     '';
 
     installPhase = ''
@@ -115,7 +115,7 @@ let
 @@ISOLATED_INTEGRATION@@
 
       # Run normal Yarn install to complete dependency installation.
-      yarn install --immutable
+      yarn install --immutable --immutable-cache
 
       runHook postConfigure
     '';
