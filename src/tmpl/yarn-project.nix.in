@@ -100,8 +100,6 @@ let
     yarn_enable_nixify = "false";
 
     configurePhase = ''
-      runHook preConfigure
-
       # Copy over the Yarn cache.
       rm -fr '${cacheFolder}'
       mkdir -p '${cacheFolder}'
@@ -111,6 +109,16 @@ let
 
       # Yarn may need a writable home directory.
       export yarn_global_folder="$TMP"
+
+      # Some node-gyp calls may call out to npm, which could fail due to an
+      # read-only home dir.
+      export HOME="$TMP"
+
+      # running preConfigure after the cache is populated allows for
+      # preConfigure to contain substituteInPlace for dependencies as well as the
+      # main project. This is necessary for native bindings that maybe have
+      # hardcoded values.
+      runHook preConfigure
 
 @@ISOLATED_INTEGRATION@@
 
