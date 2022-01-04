@@ -37,7 +37,7 @@ let
       cd "$src"
       HOME="$TMP" yarn_cache_folder="$TMP" CI=1 \
         node '${yarnPath}' nixify fetch-one $locator
-      mv "$TMP/$outputFilename" $out
+      mv "$TMP"/*.zip $out
     '';
   in lib.mapAttrs (locator: { filename, sha512 }: stdenv.mkDerivation {
     inherit src builder locator;
