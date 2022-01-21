@@ -28,6 +28,9 @@ export default class InjectBuildCommand extends Command<CommandContext> {
     );
     const { project } = await Project.find(configuration, this.context.cwd);
 
+    await project.restoreInstallState({
+      restoreResolutions: false,
+    });
     const report = await StreamReport.start(
       { configuration, stdout: this.context.stdout },
       async (report) => {
