@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       NIX_PATH: nixpkgs=channel:nixpkgs-unstable
     steps:
@@ -33,12 +35,14 @@ jobs:
     - name: Build
       run: yarn build
 
-    - name: Check dist
+    - name: Update dist
+      if: github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
       run: |
-        if [[ "$(git status --porcelain)" != "" ]]; then
-          echo "Build in dist/ is outdated"
-          exit 1
-        fi
+        [[ "$(git status --porcelain)" != "" ]] || exit
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        git commit -m 'Update dist' dist/yarn-plugin-nixify.js
+        git push
 
     - name: Install plugin
       run: yarn plugin import ./dist/yarn-plugin-nixify.js
