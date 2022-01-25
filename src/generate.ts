@@ -245,6 +245,7 @@ export default async (project: Project, cache: Cache, report: Report) => {
         `${isolatedProp} = optionalOverride (args.${overrideArg} or null) (mkIsolatedBuild { ${[
           `pname = ${json(pkg.name)};`,
           `version = ${json(pkg.version)};`,
+          `reference = ${json(pkg.reference)};`,
           `locators = [\n${locators}];`,
         ].join(` `)} });`
       );
