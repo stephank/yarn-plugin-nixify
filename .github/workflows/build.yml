@@ -38,11 +38,12 @@ jobs:
     - name: Update dist
       if: github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
       run: |
-        [[ "$(git status --porcelain)" != "" ]] || exit
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git config user.name "github-actions[bot]"
-        git commit -m 'Update dist' dist/yarn-plugin-nixify.js
-        git push
+        if [[ "$(git status --porcelain)" != "" ]]; then
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git commit -m 'Update dist' dist/yarn-plugin-nixify.js
+          git push
+        fi
 
     - name: Install plugin
       run: yarn plugin import ./dist/yarn-plugin-nixify.js
