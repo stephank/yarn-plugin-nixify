@@ -133,6 +133,11 @@ Some additional settings are available in `.yarnrc.yml`:
 
 - `isolatedNixBuilds`, see [ISOLATED_BUILDS.md](./ISOLATED_BUILDS.md).
 
+- `installNixBinariesForDependencies` can be set to also install executables
+  for binaries defined by dependencies. This can be useful if these need to be
+  in `$PATH` for other tools, or if you're creating a workspace just to collect
+  command-line tools.
+
 [niv]: https://github.com/nmattia/niv
 
 ## Hacking

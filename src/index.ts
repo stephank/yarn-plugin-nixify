@@ -13,6 +13,7 @@ declare module "@yarnpkg/core" {
     generateDefaultNix: boolean;
     enableNixPreload: boolean;
     isolatedNixBuilds: string[];
+    installNixBinariesForDependencies: boolean;
   }
 }
 
@@ -54,6 +55,11 @@ const plugin: Plugin<Hooks> = {
       type: SettingsType.STRING,
       default: [],
       isArray: true,
+    },
+    installNixBinariesForDependencies: {
+      description: `If true, the Nix output 'bin' directory will also contain executables for binaries defined by dependencies`,
+      type: SettingsType.BOOLEAN,
+      default: false,
     },
   },
 };

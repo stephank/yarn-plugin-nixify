@@ -1,2 +1,2 @@
 #!/bin/sh
-exec '@@NODE_PATH@@' '@@SCRIPT_PATH@@' "$@"
+exec '@@NODE_PATH@@' '@@BINARY_PATH@@' "$@"

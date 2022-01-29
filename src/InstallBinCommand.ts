@@ -1,6 +1,7 @@
 import { Command, Option } from "clipanion";
-import { Filename, npath, ppath, xfs } from "@yarnpkg/fslib";
+import { Filename, PortablePath, npath, ppath, xfs } from "@yarnpkg/fslib";
 import { getPnpPath } from "@yarnpkg/plugin-pnp";
+import { scriptUtils } from "@yarnpkg/core";
 
 import {
   CommandContext,
@@ -34,53 +35,73 @@ export default class InstallBinCommand extends Command<CommandContext> {
     const report = await StreamReport.start(
       { configuration, stdout: this.context.stdout },
       async (report) => {
-        if (!workspace || workspace.manifest.bin.size === 0) {
+        if (!workspace) {
           return;
         }
 
-        let nodeLinker = configuration.get(`nodeLinker`);
-        if (!supportedLinkers.includes(nodeLinker)) {
-          nodeLinker = `node-modules`;
-          report.reportWarning(
-            0,
-            `The nodeLinker ${nodeLinker} is not supported - executables may have trouble finding dependencies`
+        const binDir = npath.toPortablePath(this.binDir);
+
+        for (const [name, binaryFile] of workspace.manifest.bin) {
+          const wrapperPath = ppath.join(binDir, name as Filename);
+          const binaryPath = ppath.join(
+            project.cwd,
+            npath.toPortablePath(binaryFile)
           );
+          await this.writeWrapper(wrapperPath, binaryPath, {
+            configuration,
+            project,
+          });
         }
 
-        const binDir = npath.toPortablePath(this.binDir);
-        const pnpPath = getPnpPath(project).cjs;
-        for (const [name, scriptInput] of workspace.manifest.bin) {
-          const binPath = ppath.join(binDir, name as Filename);
-          const scriptPath = ppath.join(
-            project.cwd,
-            npath.toPortablePath(scriptInput)
+        if (configuration.get(`installNixBinariesForDependencies`)) {
+          await project.resolveEverything({ report, lockfileOnly: true });
+          const binaries = await scriptUtils.getPackageAccessibleBinaries(
+            project.topLevelWorkspace.anchoredLocator,
+            { project }
           );
-
-          let script;
-          switch (nodeLinker) {
-            case `pnp`:
-              script = renderTmpl(binWrapperPnpTmpl, {
-                NODE_PATH: process.execPath,
-                PNP_PATH: pnpPath,
-                SCRIPT_PATH: scriptPath,
-              });
-              break;
-            case `node-modules`:
-              script = renderTmpl(binWrapperNodeModulesTmpl, {
-                NODE_PATH: process.execPath,
-                SCRIPT_PATH: scriptPath,
-              });
-              break;
-            default:
-              throw Error(`Assertion failed: Invalid nodeLinker ${nodeLinker}`);
+          for (const [name, [_, binaryPath]] of binaries.entries()) {
+            const wrapperPath = ppath.join(binDir, name as Filename);
+            await this.writeWrapper(
+              wrapperPath,
+              npath.toPortablePath(binaryPath),
+              { configuration, project }
+            );
           }
-
-          await xfs.writeFilePromise(binPath, script);
-          await xfs.chmodPromise(binPath, 0o755);
         }
       }
     );
 
     return report.exitCode();
+  }
+
+  private async writeWrapper(
+    wrapperPath: PortablePath,
+    binaryPath: PortablePath,
+    {
+      configuration,
+      project,
+    }: { configuration: Configuration; project: Project }
+  ) {
+    let wrapper;
+    switch (configuration.get(`nodeLinker`)) {
+      case `pnp`:
+        wrapper = renderTmpl(binWrapperPnpTmpl, {
+          NODE_PATH: process.execPath,
+          PNP_PATH: getPnpPath(project).cjs,
+          BINARY_PATH: binaryPath,
+        });
+        break;
+      case `node-modules`:
+        wrapper = renderTmpl(binWrapperNodeModulesTmpl, {
+          NODE_PATH: process.execPath,
+          BINARY_PATH: binaryPath,
+        });
+        break;
+      default:
+        throw Error(`Assertion failed: Invalid nodeLinker`);
+    }
+
+    await xfs.writeFilePromise(wrapperPath, wrapper);
+    await xfs.chmodPromise(wrapperPath, 0o755);
   }
 }
