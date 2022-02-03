@@ -94,7 +94,7 @@ let
     # Example of providing a different source tree.
     src = pkgs.lib.cleanSource ./.;
 
-  }
+  };
 
 in project.overrideAttrs (oldAttrs: {
 
