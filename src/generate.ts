@@ -1,5 +1,4 @@
 import { Filename, npath, PortablePath, ppath, xfs } from "@yarnpkg/fslib";
-import { parseSyml } from "@yarnpkg/parsers";
 import { patchUtils } from "@yarnpkg/plugin-patch";
 import {
   computeFixedOutputStorePath,

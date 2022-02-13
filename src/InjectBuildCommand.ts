@@ -1,7 +1,6 @@
 import { Command, Option } from "clipanion";
 import { PortablePath, ppath, xfs } from "@yarnpkg/fslib";
 import { createHash } from "crypto";
-import { parseSyml, stringifySyml } from "@yarnpkg/parsers";
 
 import {
   CommandContext,

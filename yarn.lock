@@ -850,13 +850,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yarnpkg/parsers@npm:2.4.0":
-  version: 2.4.0
-  resolution: "@yarnpkg/parsers@npm:2.4.0"
+"@yarnpkg/parsers@npm:^2.4.0, @yarnpkg/parsers@npm:^2.4.1":
+  version: 2.4.1
+  resolution: "@yarnpkg/parsers@npm:2.4.1"
   dependencies:
     js-yaml: ^3.10.0
     tslib: ^1.13.0
-  checksum: ae077862b829defc95e85a328270dac5f242628656bb938e5da37913b1d0caab545de9ed9d1df3bc17f4e8da842b545df87931d39902aa2132e90699d96ecc33
+  checksum: 935f36e9c911ae2d7376b4c231918c2ec0af511b835587967fe531034628d62ee7042360452e786049be7537652c8966da4986615c6629845e252476a4aeac23
   languageName: node
   linkType: hard
 
@@ -3297,7 +3297,6 @@ __metadata:
     "@yarnpkg/cli": ^3.0.0
     "@yarnpkg/core": ^3.0.0
     "@yarnpkg/fslib": ^2.5.1
-    "@yarnpkg/parsers": ^2.4.0
     "@yarnpkg/plugin-patch": ^3.0.0
     "@yarnpkg/plugin-pnp": ^3.0.0
     babel-loader: ^8.1.0

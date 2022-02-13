@@ -10,7 +10,6 @@ const IS_PROD = process.argv[2] === `-p`;
 const EXTERNALS = [
   `@yarnpkg/core`,
   `@yarnpkg/fslib`,
-  `@yarnpkg/parsers`,
   `@yarnpkg/plugin-patch`,
   `@yarnpkg/plugin-pnp`,
   `clipanion`,

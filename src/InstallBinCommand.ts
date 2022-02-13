@@ -14,8 +14,6 @@ import binWrapperNodeModulesTmpl from "./tmpl/bin-wrapper-node-modules.sh.in";
 import binWrapperPnpTmpl from "./tmpl/bin-wrapper-pnp.sh.in";
 import { renderTmpl } from "./textUtils";
 
-const supportedLinkers = [`pnp`, `node-modules`];
-
 // Internal command that creates wrappers for binaries.
 // Used inside the Nix install phase.
 export default class InstallBinCommand extends Command<CommandContext> {
