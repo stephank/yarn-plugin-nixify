@@ -140,8 +140,8 @@ let
       mkdir -p $out/libexec $out/bin
 
       # Move the entire project to the output directory.
-      mv $PWD "$out/libexec/$sourceRoot"
-      cd "$out/libexec/$sourceRoot"
+      mv $PWD "$out/libexec/$name"
+      cd "$out/libexec/$name"
 
       # Invoke a plugin internal command to setup binaries.
       yarn nixify install-bin $out/bin
