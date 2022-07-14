@@ -137,14 +137,32 @@ let
     installPhase = ''
       runHook preInstall
 
-      mkdir -p $out/libexec $out/bin
+      mkdir -p "$out/libexec/$sourceRoot" "$out/bin"
 
-      # Move the entire project to the output directory.
-      mv $PWD "$out/libexec/$name"
+      # Move the package contents to the output directory.
+      # - If the package.json has a `files` field, only files matching those patterns are copied
+      # - Otherwise all files are copied
+      yarn pack --out package.tgz
+      tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
+
+      cp .yarnrc* "$out/libexec/$name"
+      cp --recursive .yarn "$out/libexec/$name"
+
+      # If the project uses the node-modules linker, then
+      # include the node_modules folder in the package.
+      if [ -d node_modules ]; then
+        cp --recursive node_modules "$out/libexec/$name"
+      fi
+
       cd "$out/libexec/$name"
 
       # Invoke a plugin internal command to setup binaries.
       yarn nixify install-bin $out/bin
+
+      # A package with node_modules doesn't need the cache
+      if [ -d node_modules ]; then
+        yarn cache clean
+      fi
 
       runHook postInstall
     '';
