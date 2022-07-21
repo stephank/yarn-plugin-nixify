@@ -137,7 +137,7 @@ let
     installPhase = ''
       runHook preInstall
 
-      mkdir -p "$out/libexec/$sourceRoot" "$out/bin"
+      mkdir -p "$out/libexec/$name" "$out/bin"
 
       # Move the package contents to the output directory.
       # - If the package.json has a `files` field, only files matching those patterns are copied
