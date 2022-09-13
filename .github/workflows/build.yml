@@ -77,7 +77,7 @@ jobs:
           mv new package.json
 
       - name: Test with Nix
-        run: yarn
+        run: yarn --no-immutable
 
       - name: Test nix-build
         run: nix-build
