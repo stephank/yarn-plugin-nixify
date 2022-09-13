@@ -64,11 +64,26 @@ jobs:
           name: stephank
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
 
+      - name: Add bin
+        run: |
+          cat > hello.js << EOF
+          #!/usr/bin/env node
+          require('webpack')
+          console.log('Hello nixify!')
+          EOF
+          chmod a+x hello.js
+
+          jq '.bin = { hello: "./hello.js" }' package.json > new
+          mv new package.json
+
       - name: Test with Nix
         run: yarn
 
       - name: Test nix-build
         run: nix-build
+
+      - name: Test bin
+        run: ./result/bin/hello
 
       # TODO: Check there really is a separate derivation,
       # and that Yarn actually reuses the build.
