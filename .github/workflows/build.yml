@@ -14,80 +14,79 @@ jobs:
     env:
       NIX_PATH: nixpkgs=channel:nixpkgs-unstable
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3.4.1
+        with:
+          node-version: 16.x
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3.4.1
-      with:
-        node-version: 16.x
+      - name: Yarn cache
+        uses: actions/cache@v3
+        with:
+          path: .yarn/cache
+          key: yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-
 
-    - name: Yarn cache
-      uses: actions/cache@v3
-      with:
-        path: .yarn/cache
-        key: yarn-${{ hashFiles('yarn.lock') }}
-        restore-keys: yarn-
+      - name: Yarn install
+        run: yarn install --immutable
 
-    - name: Yarn install
-      run: yarn install --immutable
+      - name: TypeScript
+        run: yarn check
 
-    - name: TypeScript
-      run: yarn check
+      - name: Build
+        run: yarn build
 
-    - name: Build
-      run: yarn build
+      - name: Update dist
+        if: github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
+        run: |
+          if [[ "$(git status --porcelain)" != "" ]]; then
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git commit -m 'Update dist' dist/yarn-plugin-nixify.js
+            git push
+          fi
 
-    - name: Update dist
-      if: github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
-      run: |
-        if [[ "$(git status --porcelain)" != "" ]]; then
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git commit -m 'Update dist' dist/yarn-plugin-nixify.js
-          git push
-        fi
+      - name: Install plugin
+        run: yarn plugin import ./dist/yarn-plugin-nixify.js
 
-    - name: Install plugin
-      run: yarn plugin import ./dist/yarn-plugin-nixify.js
+      - name: Test without Nix
+        run: yarn
 
-    - name: Test without Nix
-      run: yarn
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v17
 
-    - name: Install Nix
-      uses: nixbuild/nix-quick-install-action@v17
+      - name: Setup Cachix
+        if: github.event_name == 'push' && github.repository_owner == 'stephank'
+        uses: cachix/cachix-action@v10
+        with:
+          name: stephank
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
 
-    - name: Setup Cachix
-      if: github.event_name == 'push' && github.repository_owner == 'stephank'
-      uses: cachix/cachix-action@v10
-      with:
-        name: stephank
-        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+      - name: Test with Nix
+        run: yarn
 
-    - name: Test with Nix
-      run: yarn
+      - name: Test nix-build
+        run: nix-build
 
-    - name: Test nix-build
-      run: nix-build
+      # TODO: Check there really is a separate derivation,
+      # and that Yarn actually reuses the build.
+      - name: Test isolated builds
+        run: |
+          # Matches example in  ISOLATED_BUILDS.md
+          echo 'isolatedNixBuilds: ["sqlite3"]' >> .yarnrc.yml
+          cat > default.nix << EOF
+          { pkgs ? import <nixpkgs> { } }:
 
-    # TODO: Check there really is a separate derivation,
-    # and that Yarn actually reuses the build.
-    - name: Test isolated builds
-      run: |
-        # Matches example in  ISOLATED_BUILDS.md
-        echo 'isolatedNixBuilds: ["sqlite3"]' >> .yarnrc.yml
-        cat > default.nix << EOF
-        { pkgs ? import <nixpkgs> { } }:
+          pkgs.callPackage ./yarn-project.nix { } {
+            src = ./.;
+            overrideSqlite3Attrs = old: {
+              npm_config_sqlite = "/";  # Don't accidentally use the wrong sqlite.
+              buildInputs = old.buildInputs ++ (with pkgs; [ python3 sqlite ]);
+            };
+          }
+          EOF
 
-        pkgs.callPackage ./yarn-project.nix { } {
-          src = ./.;
-          overrideSqlite3Attrs = old: {
-            npm_config_sqlite = "/";  # Don't accidentally use the wrong sqlite.
-            buildInputs = old.buildInputs ++ (with pkgs; [ python3 sqlite ]);
-          };
-        }
-        EOF
-
-        yarn add sqlite3
-        nix-build
+          yarn add sqlite3
+          nix-build
