@@ -55,7 +55,7 @@ jobs:
         run: yarn
 
       - name: Install Nix
-        uses: nixbuild/nix-quick-install-action@v17
+        uses: nixbuild/nix-quick-install-action@v18
 
       - name: Setup Cachix
         if: github.event_name == 'push' && github.repository_owner == 'stephank'
