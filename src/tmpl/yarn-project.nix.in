@@ -26,16 +26,25 @@ let
     buildInputs = [ nodejs yarn ];
     # Tell node-gyp to use the provided Node.js headers for native code builds.
     npm_config_nodedir = nodejs;
-    # Tell node-pre-gyp to never fetch binaries / always build from source.
-    npm_config_build_from_source = "true";
   };
+
+  # Comman variables that we set in a Nix build, but not in a Nix shell.
+  buildVars = ''
+    # Make Yarn produce friendlier logging for automated builds.
+    export CI=1
+    # Tell node-pre-gyp to never fetch binaries / always build from source.
+    export npm_config_build_from_source=true
+    # Disable Nixify plugin to save on some unnecessary processing.
+    export yarn_enable_nixify=false
+  '';
 
   # Create derivations for fetching dependencies.
   cacheDrvs = let
     builder = writeShellScript "yarn-cache-builder" ''
       source $stdenv/setup
       cd "$src"
-      HOME="$TMP" yarn_cache_folder="$TMP" CI=1 \
+      ${buildVars}
+      HOME="$TMP" yarn_cache_folder="$TMP" \
         yarn nixify fetch-one $locator
       # Because we change the cache dir, Yarn may generate a different name.
       mv "$TMP/$(sed 's/-[^-]*\.[^-]*$//' <<< "$outputFilename")"-* $out
@@ -66,7 +75,12 @@ let
   # Create a derivation that builds a node-pre-gyp module in isolation.
   mkIsolatedBuild = { pname, version, reference, locators }: stdenv.mkDerivation (drvCommon // {
     inherit pname version;
-    phases = [ "buildPhase" "installPhase" ];
+    dontUnpack = true;
+
+    configurePhase = ''
+      ${buildVars}
+      unset yarn_enable_nixify # plugin is not present
+    '';
 
     buildPhase = ''
       mkdir -p .yarn/cache
@@ -97,10 +111,10 @@ let
   project = stdenv.mkDerivation (drvCommon // {
     inherit src;
     name = @@PROJECT_NAME@@;
-    # Disable Nixify plugin to save on some unnecessary processing.
-    yarn_enable_nixify = "false";
 
     configurePhase = ''
+      ${buildVars}
+
       # Copy over the Yarn cache.
       rm -fr '${cacheFolder}'
       mkdir -p '${cacheFolder}'
