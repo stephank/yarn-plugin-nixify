@@ -1074,22 +1074,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yarnpkg/plugin-pnp@npm:3.0.1":
-  version: 3.0.1
-  resolution: "@yarnpkg/plugin-pnp@npm:3.0.1"
+"@yarnpkg/plugin-pnp@npm:3.1.0":
+  version: 3.1.0
+  resolution: "@yarnpkg/plugin-pnp@npm:3.1.0"
   dependencies:
     "@types/semver": ^7.1.0
-    "@yarnpkg/fslib": ^2.5.1
-    "@yarnpkg/plugin-stage": ^3.0.0
-    "@yarnpkg/pnp": ^3.0.1
+    "@yarnpkg/fslib": ^2.6.0
+    "@yarnpkg/plugin-stage": ^3.1.0
+    "@yarnpkg/pnp": ^3.1.0
     clipanion: ^3.0.1
     micromatch: ^4.0.2
     semver: ^7.1.2
     tslib: ^1.13.0
   peerDependencies:
-    "@yarnpkg/cli": ^3.0.1
-    "@yarnpkg/core": ^3.0.0
-  checksum: 682fdaab91583a6fb662be05e660a76510df94e5d79c42f51dd19db9d5e3310b29d91111e5a8ed9fc6e382e2b581a9e0342f37852e2af96c98d33c50d9331bd4
+    "@yarnpkg/cli": ^3.1.0
+    "@yarnpkg/core": ^3.1.0
+  checksum: 9ffd901263f60c83a116a38e8bb76a9196185b36fde514c95b0336affc879308099db12ae9bd20b8f70f3253791f1127bf4f87ced5a62d2b4529a02115347f6d
   languageName: node
   linkType: hard
 
@@ -1124,7 +1124,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yarnpkg/pnp@npm:^3.0.1, @yarnpkg/pnp@npm:^3.1.0":
+"@yarnpkg/pnp@npm:^3.1.0":
   version: 3.1.0
   resolution: "@yarnpkg/pnp@npm:3.1.0"
   dependencies:
@@ -3307,7 +3307,7 @@ __metadata:
     "@yarnpkg/core": ^3.0.0
     "@yarnpkg/fslib": ^2.5.1
     "@yarnpkg/plugin-patch": ^3.0.0
-    "@yarnpkg/plugin-pnp": ^3.0.0
+    "@yarnpkg/plugin-pnp": ^3.1.0
     babel-loader: ^8.1.0
     clipanion: ^3.0.0
     prettier: 2.5.1

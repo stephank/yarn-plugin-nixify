@@ -15,6 +15,7 @@ const EXTERNALS = [
   `clipanion`,
   `crypto`,
   `os`,
+  `url`,
 ];
 
 const compiler = webpack({
