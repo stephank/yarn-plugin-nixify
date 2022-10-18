@@ -1,3 +1,3 @@
 #!/bin/sh
-export NODE_OPTIONS="--require @@PNP_PATH@@"
+export NODE_OPTIONS='@@NODE_OPTIONS@@'
 exec '@@NODE_PATH@@' '@@BINARY_PATH@@' "$@"

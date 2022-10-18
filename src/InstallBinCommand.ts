@@ -13,6 +13,7 @@ import {
 import binWrapperNodeModulesTmpl from "./tmpl/bin-wrapper-node-modules.sh.in";
 import binWrapperPnpTmpl from "./tmpl/bin-wrapper-pnp.sh.in";
 import { renderTmpl } from "./textUtils";
+import { pathToFileURL } from "url";
 
 // Internal command that creates wrappers for binaries.
 // Used inside the Nix install phase.
@@ -82,13 +83,28 @@ export default class InstallBinCommand extends Command<CommandContext> {
   ) {
     let wrapper;
     switch (configuration.get(`nodeLinker`)) {
-      case `pnp`:
+      case `pnp`: {
+        const pnpPath = getPnpPath(project);
+        const nodeOptions = [];
+        if (await xfs.existsPromise(pnpPath.cjs)) {
+          nodeOptions.push(
+            `--require "${npath.fromPortablePath(pnpPath.cjs)}"`
+          );
+        }
+        if (await xfs.existsPromise(pnpPath.esmLoader)) {
+          nodeOptions.push(
+            `--experimental-loader "${
+              pathToFileURL(npath.fromPortablePath(pnpPath.esmLoader)).href
+            }"`
+          );
+        }
         wrapper = renderTmpl(binWrapperPnpTmpl, {
           NODE_PATH: process.execPath,
-          PNP_PATH: getPnpPath(project).cjs,
+          NODE_OPTIONS: nodeOptions.join(" "),
           BINARY_PATH: binaryPath,
         });
         break;
+      }
       case `node-modules`:
         wrapper = renderTmpl(binWrapperNodeModulesTmpl, {
           NODE_PATH: process.execPath,
