@@ -46,13 +46,16 @@ export const renderTmpl = (
   let result = tmpl;
   for (const [name, value] of Object.entries(vars)) {
     if (typeof value === "string") {
-      result = result.replace(`@@${name}@@`, value);
+      result = result.replace(new RegExp(`@@${name}@@`, "g"), value);
     }
     if (typeof value === "boolean") {
-      const lines = result.split("\n");
-      const startIdx = lines.indexOf(`#@@ IF ${name}`);
-      const endIdx = lines.indexOf(`#@@ ENDIF ${name}`);
-      if (startIdx !== -1 && endIdx > startIdx) {
+      while (true) {
+        const lines = result.split("\n");
+        const startIdx = lines.indexOf(`#@@ IF ${name}`);
+        const endIdx = lines.indexOf(`#@@ ENDIF ${name}`);
+        if (startIdx === -1 || endIdx < startIdx) {
+          break;
+        }
         if (value) {
           lines.splice(endIdx, 1);
           lines.splice(startIdx, 1);
