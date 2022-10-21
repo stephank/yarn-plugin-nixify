@@ -186,6 +186,7 @@ let
 
     passthru = {
       inherit nodejs;
+      yarn-freestanding = yarn;
       yarn = writeShellScriptBin "yarn" ''
         exec '${yarn}/bin/yarn' --cwd '${project}/libexec/${project.name}' "$@"
       '';
