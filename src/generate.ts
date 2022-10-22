@@ -109,7 +109,8 @@ export default async (project: Project, cache: Cache, report: Report) => {
   }
 
   let cacheEntriesCode = `cacheEntries = {\n`;
-  for (const [locatorStr, entry] of cacheEntries) {
+  for (const locatorStr of [...cacheEntries.keys()].sort()) {
+    const entry = cacheEntries.get(locatorStr)!;
     cacheEntriesCode += `${json(locatorStr)} = { ${[
       `filename = ${json(entry.filename)};`,
       `sha512 = ${json(entry.sha512)};`,
