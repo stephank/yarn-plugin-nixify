@@ -10,6 +10,7 @@ import {
   Cache,
   execUtils,
   hashUtils,
+  InstallMode,
   LocatorHash,
   Package,
   Project,
@@ -22,8 +23,12 @@ import projectExprTmpl from "./tmpl/yarn-project.nix.in";
 import { tmpdir } from "os";
 
 // Generator function that runs after `yarn install`.
-export default async (project: Project, cache: Cache, report: Report) => {
+export default async (
+  project: Project,
+  opts: { cache: Cache; report: Report; mode?: InstallMode }
+) => {
   const { configuration, cwd } = project;
+  const { cache, report } = opts;
 
   // This case happens with `yarn dlx`, for example, and may cause errors if
   // special settings don't apply to those installations. (Like a `nixExprPath`
@@ -267,30 +272,36 @@ export default async (project: Project, cache: Cache, report: Report) => {
   }
 
   // Render the Nix expression.
-  const ident = project.topLevelWorkspace.manifest.name;
-  const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
-  const projectExpr = renderTmpl(projectExprTmpl, {
-    PROJECT_NAME: json(projectName),
-    YARN_PATH: yarnPathRel,
-    LOCKFILE: lockfileRel,
-    CACHE_FOLDER: json(cacheFolder),
-    CACHE_ENTRIES: cacheEntriesCode,
-    ISOLATED: isolatedCode.join("\n"),
-    ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),
-    NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
-  });
-  await xfs.writeFilePromise(configuration.get(`nixExprPath`), projectExpr);
+  //
+  // If isolated builds are used, we rely on the build state, so don't render
+  // if a special `--mode` was specified. This is because skipping builds may
+  // give us an incomplete build state.
+  if (opts.mode == null || isolatedBuilds.length === 0) {
+    const ident = project.topLevelWorkspace.manifest.name;
+    const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
+    const projectExpr = renderTmpl(projectExprTmpl, {
+      PROJECT_NAME: json(projectName),
+      YARN_PATH: yarnPathRel,
+      LOCKFILE: lockfileRel,
+      CACHE_FOLDER: json(cacheFolder),
+      CACHE_ENTRIES: cacheEntriesCode,
+      ISOLATED: isolatedCode.join("\n"),
+      ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),
+      NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
+    });
+    await xfs.writeFilePromise(configuration.get(`nixExprPath`), projectExpr);
 
-  // Create a wrapper if it does not exist yet.
-  if (configuration.get(`generateDefaultNix`)) {
-    const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
-    const flakeExprPath = ppath.join(cwd, `flake.nix` as Filename);
-    if (!xfs.existsSync(defaultExprPath) && !xfs.existsSync(flakeExprPath)) {
-      await xfs.writeFilePromise(defaultExprPath, defaultExprTmpl);
-      report.reportInfo(
-        0,
-        `A minimal default.nix was created. You may want to customize it.`
-      );
+    // Create a wrapper if it does not exist yet.
+    if (configuration.get(`generateDefaultNix`)) {
+      const defaultExprPath = ppath.join(cwd, `default.nix` as Filename);
+      const flakeExprPath = ppath.join(cwd, `flake.nix` as Filename);
+      if (!xfs.existsSync(defaultExprPath) && !xfs.existsSync(flakeExprPath)) {
+        await xfs.writeFilePromise(defaultExprPath, defaultExprTmpl);
+        report.reportInfo(
+          0,
+          `A minimal default.nix was created. You may want to customize it.`
+        );
+      }
     }
   }
 

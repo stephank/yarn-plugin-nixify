@@ -25,7 +25,7 @@ const plugin: Plugin<Hooks> = {
         opts.persistProject !== false &&
         project.configuration.get(`enableNixify`)
       ) {
-        await generate(project, opts.cache, opts.report);
+        await generate(project, opts);
       }
     },
   },
