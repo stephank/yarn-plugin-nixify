@@ -159,7 +159,7 @@ let
       yarn pack --out package.tgz
       tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
-      cp .yarnrc* "$out/libexec/$name"
+      cp .yarnrc* '@@LOCKFILE@@' "$out/libexec/$name"
       cp --recursive .yarn "$out/libexec/$name"
 
       # If the project uses the node-modules linker, then
