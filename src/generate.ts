@@ -81,11 +81,6 @@ export default async (
   // Determine relative paths for Nix path literals.
   const nixExprPath = configuration.get(`nixExprPath`);
   const lockfileFilename = configuration.get(`lockfileFilename`);
-  const lockfileRel = ppath.relative(
-    ppath.dirname(nixExprPath),
-    lockfileFilename
-  );
-  const yarnPathRel = ppath.relative(ppath.dirname(nixExprPath), yarnPath);
 
   // Build a list of cache entries so Nix can fetch them.
   // TODO: See if we can use Nix fetchurl for npm: dependencies.
@@ -281,8 +276,8 @@ export default async (
     const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
     const projectExpr = renderTmpl(projectExprTmpl, {
       PROJECT_NAME: json(projectName),
-      YARN_PATH: yarnPathRel,
-      LOCKFILE: lockfileRel,
+      YARN_PATH: yarnPath,
+      LOCKFILE: lockfileFilename,
       CACHE_FOLDER: json(cacheFolder),
       CACHE_ENTRIES: cacheEntriesCode,
       ISOLATED: isolatedCode.join("\n"),
