@@ -188,11 +188,13 @@ let
       inherit nodejs;
       yarn-freestanding = yarn;
       yarn = writeShellScriptBin "yarn" ''
-        exec '${yarn}/bin/yarn' --cwd '${project}/libexec/${project.name}' "$@"
+        exec '${yarn}/bin/yarn' --cwd '${overriddenProject}/libexec/${overriddenProject.name}' "$@"
       '';
     };
   });
 
+  overriddenProject = optionalOverride overrideAttrs project;
+
 @@CACHE_ENTRIES@@
 @@ISOLATED@@
-in optionalOverride overrideAttrs project
+in overriddenProject
