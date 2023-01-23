@@ -154,21 +154,27 @@ let
       mkdir -p "$out/libexec/$name" "$out/bin"
 
       # Move the package contents to the output directory.
-      # - If the package.json has a `files` field, only files matching those patterns are copied
-      # - Otherwise all files are copied
-      yarn pack --out package.tgz
-      tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
-
-      cp .yarnrc* '@@LOCKFILE@@' "$out/libexec/$name"
-      cp --recursive .yarn "$out/libexec/$name"
-
-      # If the project uses the node-modules linker, then
-      # include the node_modules folder in the package.
-      if [ -d node_modules ]; then
-        cp --recursive node_modules "$out/libexec/$name"
+      if grep -q '"workspaces"' package.json; then
+        # We can't use `yarn pack` in a workspace setup, because it only
+        # packages the outer workspace.
+        mv $PWD "$out/libexec/$name"
       else
-        # Otherwise, assume PnP. Copy the loader into the package.
-        cp .pnp.* "$out/libexec/$name"
+        # - If the package.json has a `files` field, only files matching those patterns are copied
+        # - Otherwise all files are copied.
+        yarn pack --out package.tgz
+        tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
+
+        cp .yarnrc* '@@LOCKFILE@@' "$out/libexec/$name"
+        cp --recursive .yarn "$out/libexec/$name"
+
+        # If the project uses the node-modules linker, then
+        # include the node_modules folder in the package.
+        if [ -d node_modules ]; then
+          cp --recursive node_modules "$out/libexec/$name"
+        else
+          # Otherwise, assume PnP. Copy the loader into the package.
+          cp .pnp.* "$out/libexec/$name"
+        fi
       fi
 
       cd "$out/libexec/$name"
