@@ -64,13 +64,10 @@ export default async (
   const cacheFolderAbs = configuration.get(`cacheFolder`);
   let cacheFolderExpr: string;
   if (cacheFolderAbs.startsWith(cwd)) {
-    cacheFolderExpr =
-      "./" + ppath.relative(ppath.dirname(nixExprPath), cacheFolderAbs);
+    cacheFolderExpr = json(ppath.relative(cwd, cacheFolderAbs));
   } else {
-    cacheFolderExpr = json(cacheFolderAbs);
-    report.reportWarning(
-      0,
-      `The cache folder ${cacheFolderAbs} is outside the project - it may not be reachable by the Nix build`
+    throw Error(
+      `The cache folder ${cacheFolderAbs} is outside the project, this is currently not supported`
     );
   }
 
