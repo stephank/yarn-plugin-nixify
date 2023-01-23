@@ -47,8 +47,11 @@ export default async (
 
   // Sanity checks.
   const yarnPathAbs = configuration.get(`yarnPath`);
-  let yarnPath = ppath.relative(cwd, yarnPathAbs);
-  if (yarnPath.startsWith(`../`)) {
+  const nixExprPath = configuration.get(`nixExprPath`);
+  let yarnPath: PortablePath;
+  if (yarnPathAbs.startsWith(cwd)) {
+    yarnPath = ppath.relative(ppath.dirname(nixExprPath), yarnPathAbs);
+  } else {
     yarnPath = yarnPathAbs;
     report.reportWarning(
       0,
@@ -79,7 +82,6 @@ export default async (
   }
 
   // Determine relative paths for Nix path literals.
-  const nixExprPath = configuration.get(`nixExprPath`);
   const lockfileFilename = configuration.get(`lockfileFilename`);
 
   // Build a list of cache entries so Nix can fetch them.
@@ -284,7 +286,7 @@ export default async (
       ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),
       NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
     });
-    await xfs.writeFilePromise(configuration.get(`nixExprPath`), projectExpr);
+    await xfs.writeFilePromise(nixExprPath, projectExpr);
 
     // Create a wrapper if it does not exist yet.
     if (configuration.get(`generateDefaultNix`)) {
