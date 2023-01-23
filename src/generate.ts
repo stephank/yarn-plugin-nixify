@@ -45,14 +45,16 @@ export default async (
     return;
   }
 
-  // Sanity checks.
-  const yarnPathAbs = configuration.get(`yarnPath`);
+  // Determine relative paths for Nix path literals.
   const nixExprPath = configuration.get(`nixExprPath`);
-  let yarnPath: PortablePath;
+
+  const yarnPathAbs = configuration.get(`yarnPath`);
+  let yarnPathExpr: string;
   if (yarnPathAbs.startsWith(cwd)) {
-    yarnPath = ppath.relative(ppath.dirname(nixExprPath), yarnPathAbs);
+    yarnPathExpr =
+      "./" + ppath.relative(ppath.dirname(nixExprPath), yarnPathAbs);
   } else {
-    yarnPath = yarnPathAbs;
+    yarnPathExpr = json(yarnPathAbs);
     report.reportWarning(
       0,
       `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`
@@ -60,29 +62,42 @@ export default async (
   }
 
   const cacheFolderAbs = configuration.get(`cacheFolder`);
-  let cacheFolder = ppath.relative(cwd, cacheFolderAbs);
-  if (cacheFolder.startsWith(`../`)) {
-    cacheFolder = cacheFolderAbs;
+  let cacheFolderExpr: string;
+  if (cacheFolderAbs.startsWith(cwd)) {
+    cacheFolderExpr =
+      "./" + ppath.relative(ppath.dirname(nixExprPath), cacheFolderAbs);
+  } else {
+    cacheFolderExpr = json(cacheFolderAbs);
     report.reportWarning(
       0,
       `The cache folder ${cacheFolderAbs} is outside the project - it may not be reachable by the Nix build`
     );
   }
 
-  for (const source of configuration.sources.values()) {
-    if (!source.startsWith(`<`)) {
-      const relativeSource = ppath.relative(cwd, source as PortablePath);
-      if (relativeSource.startsWith(`../`)) {
-        report.reportWarning(
-          0,
-          `The config file ${source} is outside the project - it may not be reachable by the Nix build`
-        );
+  const configSources = new Set();
+  for (const sourceList of configuration.sources.values()) {
+    for (const source of sourceList.split(", ")) {
+      if (!source.startsWith(`<`)) {
+        configSources.add(source);
       }
     }
   }
+  for (const source of configSources) {
+    const relativeSource = ppath.resolve(cwd, source as PortablePath);
+    if (!relativeSource.startsWith(cwd)) {
+      report.reportWarning(
+        0,
+        `The config file ${source} is outside the project - it may not be reachable by the Nix build`
+      );
+    }
+  }
 
-  // Determine relative paths for Nix path literals.
-  const lockfileFilename = configuration.get(`lockfileFilename`);
+  const lockfileExpr =
+    "./" +
+    ppath.relative(
+      ppath.dirname(nixExprPath),
+      ppath.resolve(cwd, configuration.get(`lockfileFilename`))
+    );
 
   // Build a list of cache entries so Nix can fetch them.
   // TODO: See if we can use Nix fetchurl for npm: dependencies.
@@ -278,9 +293,9 @@ export default async (
     const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
     const projectExpr = renderTmpl(projectExprTmpl, {
       PROJECT_NAME: json(projectName),
-      YARN_PATH: yarnPath,
-      LOCKFILE: lockfileFilename,
-      CACHE_FOLDER: json(cacheFolder),
+      YARN_PATH: yarnPathExpr,
+      LOCKFILE: lockfileExpr,
+      CACHE_FOLDER: cacheFolderExpr,
       CACHE_ENTRIES: cacheEntriesCode,
       ISOLATED: isolatedCode.join("\n"),
       ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),

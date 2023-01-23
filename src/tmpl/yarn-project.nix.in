@@ -7,9 +7,7 @@
 let
 
   cacheFolder = @@CACHE_FOLDER@@;
-#@@ IF NEED_ISOLATED_BUILD_SUPPRORT
-  lockfile = ./@@LOCKFILE@@;
-#@@ ENDIF NEED_ISOLATED_BUILD_SUPPRORT
+  lockfile = @@LOCKFILE@@;
 
   # Call overrideAttrs on a derivation if a function is provided.
   optionalOverride = fn: drv:
@@ -17,7 +15,7 @@ let
 
   # Simple stub that provides the global yarn command.
   yarn = writeShellScriptBin "yarn" ''
-    exec '${nodejs}/bin/node' '${./@@YARN_PATH@@}' "$@"
+    exec '${nodejs}/bin/node' '${@@YARN_PATH@@}' "$@"
   '';
 
   # Common attributes between Yarn derivations.
@@ -164,7 +162,7 @@ let
         mkdir -p "$out/libexec/$name"
         tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
-        cp .yarnrc* '@@LOCKFILE@@' "$out/libexec/$name"
+        cp .yarnrc* ${lockfile} "$out/libexec/$name"
         cp --recursive .yarn "$out/libexec/$name"
 
         # If the project uses the node-modules linker, then
