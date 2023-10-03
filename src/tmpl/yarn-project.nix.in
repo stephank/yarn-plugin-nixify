@@ -162,7 +162,8 @@ let
         mkdir -p "$out/libexec/$name"
         tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
-        cp .yarnrc* ${lockfile} "$out/libexec/$name"
+        cp .yarnrc* "$out/libexec/$name"
+        cp ${lockfile} "$out/libexec/$name/yarn.lock"
         cp --recursive .yarn "$out/libexec/$name"
 
         # If the project uses the node-modules linker, then
