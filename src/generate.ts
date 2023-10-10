@@ -93,7 +93,7 @@ export default async (
     "./" +
     ppath.relative(
       ppath.dirname(nixExprPath),
-      ppath.resolve(cwd, configuration.get(`lockfileFilename`))
+      ppath.resolve(cwd, 'yarn.lock' as PortablePath)
     );
 
   // Build a list of cache entries so Nix can fetch them.
