@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    strategy:
+      matrix:
+        yarn_version: [3, 4]
     env:
       NIX_PATH: nixpkgs=channel:nixpkgs-unstable
     steps:
@@ -25,24 +28,18 @@ jobs:
       - name: Enable corepack
         run: corepack enable
 
-      - name: Yarn cache
-        uses: actions/cache@v3
-        with:
-          path: .yarn/cache
-          key: yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: yarn-
-
       - name: Yarn install
-        run: yarn install --immutable
+        run: yarn
 
       - name: TypeScript
+        if: matrix.yarn_version == 4
         run: yarn check
 
       - name: Build
         run: yarn build
 
       - name: Update dist
-        if: github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
+        if: matrix.yarn_version == 4 && github.repository_owner == 'stephank' && github.ref == 'refs/heads/main'
         run: |
           if [[ "$(git status --porcelain)" != "" ]]; then
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -51,23 +48,19 @@ jobs:
             git push
           fi
 
+      - name: Set Yarn version
+        run: yarn set version ${{ matrix.yarn_version }}
+
       - name: Install plugin
         run: yarn plugin import ./dist/yarn-plugin-nixify.js
 
       - name: Test without Nix
-        run: yarn
+        run: yarn --no-immutable
 
       - name: Install Nix
         uses: cachix/install-nix-action@v23
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-
-      - name: Setup Cachix
-        if: github.event_name == 'push' && github.repository_owner == 'stephank'
-        uses: cachix/cachix-action@v12
-        with:
-          name: stephank
-          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
 
       - name: Add bin
         run: |
