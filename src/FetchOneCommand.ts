@@ -18,7 +18,7 @@ export default class FetchOneCommand extends Command<CommandContext> {
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,
-      this.context.plugins
+      this.context.plugins,
     );
     const { project } = await Project.find(configuration, this.context.cwd);
     const cache = await Cache.find(configuration);
@@ -42,7 +42,7 @@ export default class FetchOneCommand extends Command<CommandContext> {
           fetcher,
           report,
         });
-      }
+      },
     );
 
     return report.exitCode();

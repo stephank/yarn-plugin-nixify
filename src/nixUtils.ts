@@ -46,7 +46,7 @@ export const computeFixedOutputStorePath = (
   name: string,
   hashAlgorithm: string,
   hash: Buffer,
-  storePath = `/nix/store` as PortablePath
+  storePath = `/nix/store` as PortablePath,
 ) => {
   const hashHex = hash.toString("hex");
 

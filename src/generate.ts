@@ -25,7 +25,7 @@ import { tmpdir } from "os";
 // Generator function that runs after `yarn install`.
 export default async (
   project: Project,
-  opts: { cache: Cache; report: Report; mode?: InstallMode }
+  opts: { cache: Cache; report: Report; mode?: InstallMode },
 ) => {
   const { configuration, cwd } = project;
   const { cache, report } = opts;
@@ -40,7 +40,7 @@ export default async (
   if (project.cwd.startsWith(tempDir)) {
     report.reportInfo(
       0,
-      `Skipping Nixify, because ${project.cwd} appears to be a temporary directory`
+      `Skipping Nixify, because ${project.cwd} appears to be a temporary directory`,
     );
     return;
   }
@@ -57,7 +57,7 @@ export default async (
     yarnPathExpr = json(yarnPathAbs);
     report.reportWarning(
       0,
-      `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`
+      `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`,
     );
   }
 
@@ -67,7 +67,7 @@ export default async (
     cacheFolderExpr = json(ppath.relative(cwd, cacheFolderAbs));
   } else {
     throw Error(
-      `The cache folder ${cacheFolderAbs} is outside the project, this is currently not supported`
+      `The cache folder ${cacheFolderAbs} is outside the project, this is currently not supported`,
     );
   }
 
@@ -84,7 +84,7 @@ export default async (
     if (!relativeSource.startsWith(cwd)) {
       report.reportWarning(
         0,
-        `The config file ${source} is outside the project - it may not be reachable by the Nix build`
+        `The config file ${source} is outside the project - it may not be reachable by the Nix build`,
       );
     }
   }
@@ -93,7 +93,7 @@ export default async (
     "./" +
     ppath.relative(
       ppath.dirname(nixExprPath),
-      ppath.resolve(cwd, 'yarn.lock' as PortablePath)
+      ppath.resolve(cwd, "yarn.lock" as PortablePath),
     );
 
   // Build a list of cache entries so Nix can fetch them.
@@ -149,11 +149,11 @@ export default async (
 
     if (structUtils.isVirtualLocator(pkg)) {
       const devirtPkg = project.storedPackages.get(
-        structUtils.devirtualizeLocator(pkg).locatorHash
+        structUtils.devirtualizeLocator(pkg).locatorHash,
       );
       if (!devirtPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -162,11 +162,11 @@ export default async (
 
     if (pkg.reference.startsWith("patch:")) {
       const depatchPkg = project.storedPackages.get(
-        patchUtils.parseLocator(pkg).sourceLocator.locatorHash
+        patchUtils.parseLocator(pkg).sourceLocator.locatorHash,
       );
       if (!depatchPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -175,18 +175,18 @@ export default async (
 
     for (const dependency of pkg.dependencies.values()) {
       const resolution = project.storedResolutions.get(
-        dependency.descriptorHash
+        dependency.descriptorHash,
       );
       if (!resolution) {
         throw Error(
-          "Assertion failed: The descriptor should have been registered"
+          "Assertion failed: The descriptor should have been registered",
         );
       }
 
       const depPkg = project.storedPackages.get(resolution);
       if (!depPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -217,13 +217,13 @@ export default async (
           ppath.join(
             pnpUnpluggedFolder,
             structUtils.slugifyLocator(pkg),
-            structUtils.getIdentVendorPath(pkg)
-          )
+            structUtils.getIdentVendorPath(pkg),
+          ),
         );
         break;
       default:
         throw Error(
-          `The nodeLinker ${nodeLinker} is not supported for isolated Nix builds`
+          `The nodeLinker ${nodeLinker} is not supported for isolated Nix builds`,
         );
     }
 
@@ -236,7 +236,7 @@ export default async (
       const pkg = project.storedPackages.get(locatorHash);
       if (!pkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
       devirtPkg = pkg;
@@ -261,7 +261,7 @@ export default async (
           `version = ${json(pkg.version)};`,
           `reference = ${json(devirtPkg.reference)};`,
           `locators = [\n${locators}];`,
-        ].join(` `)} });`
+        ].join(` `)} });`,
       );
     }
 
@@ -273,7 +273,7 @@ export default async (
       `yarn nixify inject-build \\`,
       `  ${json(injectLocatorStr)} \\`,
       `  $\{${isolatedProp}} \\`,
-      `  ${json(installLocation)}`
+      `  ${json(installLocation)}`,
     );
   }
   if (isolatedIntegration.length > 0) {
@@ -308,7 +308,7 @@ export default async (
         await xfs.writeFilePromise(defaultExprPath, defaultExprTmpl);
         report.reportInfo(
           0,
-          `A minimal default.nix was created. You may want to customize it.`
+          `A minimal default.nix was created. You may want to customize it.`,
         );
       }
     }
@@ -355,13 +355,13 @@ export default async (
             {
               cwd: project.cwd,
               strict: true,
-            }
+            },
           );
         }
         if (numToPreload !== 0) {
           report.reportInfo(
             0,
-            `Preloaded ${numToPreload} packages into the Nix store`
+            `Preloaded ${numToPreload} packages into the Nix store`,
           );
         }
       } catch (err: any) {
