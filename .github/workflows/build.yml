@@ -85,7 +85,10 @@ jobs:
         run: yarn --no-immutable
 
       - name: Test nix-build
-        run: nix-build
+        run: |
+          # This delete tests refetching a package with Nix.
+          nix-store --delete /nix/store/*--yarnpkg-core-npm-*
+          nix-build
 
       - name: Test bin
         run: ./result/bin/hello
