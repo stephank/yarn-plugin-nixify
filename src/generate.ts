@@ -143,7 +143,9 @@ export default async (
       originalFilename: filename,
       // Rebuild the filename, because the cache file we're operating on may be
       // from the mirror directory, which uses different naming.
-      filename: cache.getChecksumFilename(pkg, sha512),
+      filename: checksum
+        ? cache.getChecksumFilename(pkg, checksum)
+        : cache.getVersionFilename(pkg),
       sha512,
     });
   }
