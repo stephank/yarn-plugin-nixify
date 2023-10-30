@@ -1,6 +1,4 @@
-/.yarn/*
-!/.yarn/releases
-!/.yarn/plugins
+/.yarn
 /.pnp.*
 
 /dist/yarn-plugin-nixify.dev.js

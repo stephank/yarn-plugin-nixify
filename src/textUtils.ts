@@ -24,7 +24,7 @@ export const upperCamelize = (name: string) =>
 export const indent = (
   prefix: string,
   text: string,
-  includeEmptyLines = false
+  includeEmptyLines = false,
 ): string =>
   text
     .split("\n")
@@ -41,7 +41,7 @@ export const indent = (
  */
 export const renderTmpl = (
   tmpl: string,
-  vars: { [name: string]: string | boolean }
+  vars: { [name: string]: string | boolean },
 ): string => {
   let result = tmpl;
   for (const [name, value] of Object.entries(vars)) {

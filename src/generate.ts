@@ -1,13 +1,11 @@
+import { tmpdir } from "os";
+
 import { Filename, npath, PortablePath, ppath, xfs } from "@yarnpkg/fslib";
 import { patchUtils } from "@yarnpkg/plugin-patch";
-import {
-  computeFixedOutputStorePath,
-  sanitizeDerivationName,
-} from "./nixUtils";
 import { json, indent, renderTmpl, upperCamelize } from "./textUtils";
-
 import {
   Cache,
+  YarnVersion,
   execUtils,
   hashUtils,
   InstallMode,
@@ -20,12 +18,17 @@ import {
 
 import defaultExprTmpl from "./tmpl/default.nix.in";
 import projectExprTmpl from "./tmpl/yarn-project.nix.in";
-import { tmpdir } from "os";
+import {
+  computeFixedOutputStorePath,
+  sanitizeDerivationName,
+} from "./nixUtils";
+
+const isYarn3 = YarnVersion?.startsWith("3.") || false;
 
 // Generator function that runs after `yarn install`.
 export default async (
   project: Project,
-  opts: { cache: Cache; report: Report; mode?: InstallMode }
+  opts: { cache: Cache; report: Report; mode?: InstallMode },
 ) => {
   const { configuration, cwd } = project;
   const { cache, report } = opts;
@@ -40,7 +43,7 @@ export default async (
   if (project.cwd.startsWith(tempDir)) {
     report.reportInfo(
       0,
-      `Skipping Nixify, because ${project.cwd} appears to be a temporary directory`
+      `Skipping Nixify, because ${project.cwd} appears to be a temporary directory`,
     );
     return;
   }
@@ -49,15 +52,27 @@ export default async (
   const nixExprPath = configuration.get(`nixExprPath`);
 
   const yarnPathAbs = configuration.get(`yarnPath`);
-  let yarnPathExpr: string;
-  if (yarnPathAbs.startsWith(cwd)) {
-    yarnPathExpr =
+  let yarnBinExpr: string;
+  if (yarnPathAbs === null) {
+    // Assume the current running script is the correct Yarn.
+    const hexHash = await hashUtils.checksumFile(
+      process.argv[1] as PortablePath,
+    );
+    const sriHash = "sha512-" + Buffer.from(hexHash, "hex").toString("base64");
+    yarnBinExpr = [
+      "fetchurl {",
+      `  url = "https://repo.yarnpkg.com/${YarnVersion!}/packages/yarnpkg-cli/bin/yarn.js";`,
+      `  hash = "${sriHash}";`,
+      "}",
+    ].join("\n  ");
+  } else if (yarnPathAbs.startsWith(cwd)) {
+    yarnBinExpr =
       "./" + ppath.relative(ppath.dirname(nixExprPath), yarnPathAbs);
   } else {
-    yarnPathExpr = json(yarnPathAbs);
+    yarnBinExpr = json(yarnPathAbs);
     report.reportWarning(
       0,
-      `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`
+      `The Yarn path ${yarnPathAbs} is outside the project - it may not be reachable by the Nix build`,
     );
   }
 
@@ -65,9 +80,11 @@ export default async (
   let cacheFolderExpr: string;
   if (cacheFolderAbs.startsWith(cwd)) {
     cacheFolderExpr = json(ppath.relative(cwd, cacheFolderAbs));
+  } else if (!isYarn3 && configuration.get(`enableGlobalCache`)) {
+    cacheFolderExpr = '".yarn/cache"';
   } else {
     throw Error(
-      `The cache folder ${cacheFolderAbs} is outside the project, this is currently not supported`
+      `The cache folder ${cacheFolderAbs} is outside the project, this is currently not supported`,
     );
   }
 
@@ -84,7 +101,7 @@ export default async (
     if (!relativeSource.startsWith(cwd)) {
       report.reportWarning(
         0,
-        `The config file ${source} is outside the project - it may not be reachable by the Nix build`
+        `The config file ${source} is outside the project - it may not be reachable by the Nix build`,
       );
     }
   }
@@ -93,12 +110,13 @@ export default async (
     "./" +
     ppath.relative(
       ppath.dirname(nixExprPath),
-      ppath.resolve(cwd, 'yarn.lock' as PortablePath)
+      ppath.resolve(cwd, "yarn.lock" as PortablePath),
     );
 
   // Build a list of cache entries so Nix can fetch them.
   // TODO: See if we can use Nix fetchurl for npm: dependencies.
   interface CacheEntry {
+    originalFilename: Filename;
     filename: Filename;
     sha512: string;
   }
@@ -109,7 +127,9 @@ export default async (
   for (const pkg of project.storedPackages.values()) {
     const { locatorHash } = pkg;
     const checksum = project.storedChecksums.get(locatorHash);
-    const cachePath = cache.getLocatorPath(pkg, checksum || null, cacheOptions);
+    const cachePath = isYarn3
+      ? (cache as any).getLocatorPath(pkg, checksum || null, cacheOptions)
+      : cache.getLocatorPath(pkg, checksum || null);
     if (!cachePath) continue;
 
     const filename = ppath.basename(cachePath);
@@ -119,7 +139,13 @@ export default async (
     const sha512 = checksum
       ? checksum.split(`/`).pop()!
       : await hashUtils.checksumFile(cachePath);
-    cacheEntries.set(locatorStr, { filename, sha512 });
+    cacheEntries.set(locatorStr, {
+      originalFilename: filename,
+      // Rebuild the filename, because the cache file we're operating on may be
+      // from the mirror directory, which uses different naming.
+      filename: cache.getChecksumFilename(pkg, sha512),
+      sha512,
+    });
   }
 
   let cacheEntriesCode = `cacheEntries = {\n`;
@@ -149,11 +175,11 @@ export default async (
 
     if (structUtils.isVirtualLocator(pkg)) {
       const devirtPkg = project.storedPackages.get(
-        structUtils.devirtualizeLocator(pkg).locatorHash
+        structUtils.devirtualizeLocator(pkg).locatorHash,
       );
       if (!devirtPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -162,11 +188,11 @@ export default async (
 
     if (pkg.reference.startsWith("patch:")) {
       const depatchPkg = project.storedPackages.get(
-        patchUtils.parseLocator(pkg).sourceLocator.locatorHash
+        patchUtils.parseLocator(pkg).sourceLocator.locatorHash,
       );
       if (!depatchPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -175,18 +201,18 @@ export default async (
 
     for (const dependency of pkg.dependencies.values()) {
       const resolution = project.storedResolutions.get(
-        dependency.descriptorHash
+        dependency.descriptorHash,
       );
       if (!resolution) {
         throw Error(
-          "Assertion failed: The descriptor should have been registered"
+          "Assertion failed: The descriptor should have been registered",
         );
       }
 
       const depPkg = project.storedPackages.get(resolution);
       if (!depPkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
 
@@ -217,13 +243,13 @@ export default async (
           ppath.join(
             pnpUnpluggedFolder,
             structUtils.slugifyLocator(pkg),
-            structUtils.getIdentVendorPath(pkg)
-          )
+            structUtils.getIdentVendorPath(pkg),
+          ),
         );
         break;
       default:
         throw Error(
-          `The nodeLinker ${nodeLinker} is not supported for isolated Nix builds`
+          `The nodeLinker ${nodeLinker} is not supported for isolated Nix builds`,
         );
     }
 
@@ -236,7 +262,7 @@ export default async (
       const pkg = project.storedPackages.get(locatorHash);
       if (!pkg) {
         throw Error(
-          `Assertion failed: The locator should have been registered`
+          `Assertion failed: The locator should have been registered`,
         );
       }
       devirtPkg = pkg;
@@ -261,7 +287,7 @@ export default async (
           `version = ${json(pkg.version)};`,
           `reference = ${json(devirtPkg.reference)};`,
           `locators = [\n${locators}];`,
-        ].join(` `)} });`
+        ].join(` `)} });`,
       );
     }
 
@@ -273,7 +299,7 @@ export default async (
       `yarn nixify inject-build \\`,
       `  ${json(injectLocatorStr)} \\`,
       `  $\{${isolatedProp}} \\`,
-      `  ${json(installLocation)}`
+      `  ${json(installLocation)}`,
     );
   }
   if (isolatedIntegration.length > 0) {
@@ -290,7 +316,7 @@ export default async (
     const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
     const projectExpr = renderTmpl(projectExprTmpl, {
       PROJECT_NAME: json(projectName),
-      YARN_PATH: yarnPathExpr,
+      YARN_BIN: yarnBinExpr,
       LOCKFILE: lockfileExpr,
       CACHE_FOLDER: cacheFolderExpr,
       CACHE_ENTRIES: cacheEntriesCode,
@@ -308,7 +334,7 @@ export default async (
         await xfs.writeFilePromise(defaultExprPath, defaultExprTmpl);
         report.reportInfo(
           0,
-          `A minimal default.nix was created. You may want to customize it.`
+          `A minimal default.nix was created. You may want to customize it.`,
         );
       }
     }
@@ -321,7 +347,10 @@ export default async (
   ) {
     await xfs.mktempPromise(async (tempDir) => {
       const toPreload: PortablePath[] = [];
-      for (const [locator, { filename, sha512 }] of cacheEntries.entries()) {
+      for (const [
+        locator,
+        { originalFilename, sha512 },
+      ] of cacheEntries.entries()) {
         const name = sanitizeDerivationName(locator);
         // Check to see if the Nix store entry already exists.
         const hash = Buffer.from(sha512, "hex");
@@ -336,7 +365,7 @@ export default async (
           const subdir = ppath.join(tempDir, sha512.slice(0, 7) as Filename);
           await xfs.mkdirPromise(subdir);
 
-          const src = ppath.join(cache.cwd, filename);
+          const src = ppath.join(cache.cwd, originalFilename);
           const dst = ppath.join(subdir, name as Filename);
           await xfs.copyFilePromise(src, dst);
 
@@ -355,13 +384,13 @@ export default async (
             {
               cwd: project.cwd,
               strict: true,
-            }
+            },
           );
         }
         if (numToPreload !== 0) {
           report.reportInfo(
             0,
-            `Preloaded ${numToPreload} packages into the Nix store`
+            `Preloaded ${numToPreload} packages into the Nix store`,
           );
         }
       } catch (err: any) {

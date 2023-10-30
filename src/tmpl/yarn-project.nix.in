@@ -6,6 +6,8 @@
 
 let
 
+  yarnBin = @@YARN_BIN@@;
+
   cacheFolder = @@CACHE_FOLDER@@;
   lockfile = @@LOCKFILE@@;
 
@@ -15,7 +17,7 @@ let
 
   # Simple stub that provides the global yarn command.
   yarn = writeShellScriptBin "yarn" ''
-    exec '${nodejs}/bin/node' '${@@YARN_PATH@@}' "$@"
+    exec '${nodejs}/bin/node' '${yarnBin}' "$@"
   '';
 
   # Common attributes between Yarn derivations.
@@ -42,7 +44,7 @@ let
       source $stdenv/setup
       cd "$src"
       ${buildVars}
-      HOME="$TMP" yarn_cache_folder="$TMP" \
+      HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$TMP" \
         yarn nixify fetch-one $locator
       # Because we change the cache dir, Yarn may generate a different name.
       mv "$TMP/$(sed 's/-[^-]*\.[^-]*$//' <<< "$outputFilename")"-* $out
@@ -89,7 +91,8 @@ let
       echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
       install -m 0600 ${lockfile} ./yarn.lock
       export yarn_global_folder="$TMP"
-      export YARN_ENABLE_IMMUTABLE_INSTALLS=false
+      export yarn_enable_global_cache=false
+      export yarn_enable_immutable_installs=false
       yarn --immutable-cache
     '';
 
@@ -122,6 +125,11 @@ let
 
       # Yarn may need a writable home directory.
       export yarn_global_folder="$TMP"
+
+      # Ensure global cache is disabled. Cache must be part of our output.
+      touch .yarnrc.yml
+      sed -i -e '/^enableGlobalCache/d' .yarnrc.yml
+      echo 'enableGlobalCache: false' >> .yarnrc.yml
 
       # Some node-gyp calls may call out to npm, which could fail due to an
       # read-only home dir.

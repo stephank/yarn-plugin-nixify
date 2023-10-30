@@ -24,11 +24,11 @@ export default class InstallBinCommand extends Command<CommandContext> {
   async execute() {
     const configuration = await Configuration.find(
       this.context.cwd,
-      this.context.plugins
+      this.context.plugins,
     );
     const { project, workspace } = await Project.find(
       configuration,
-      this.context.cwd
+      this.context.cwd,
     );
 
     const report = await StreamReport.start(
@@ -44,7 +44,7 @@ export default class InstallBinCommand extends Command<CommandContext> {
           const wrapperPath = ppath.join(binDir, name as Filename);
           const binaryPath = ppath.join(
             project.cwd,
-            npath.toPortablePath(binaryFile)
+            npath.toPortablePath(binaryFile),
           );
           await this.writeWrapper(wrapperPath, binaryPath, {
             configuration,
@@ -56,18 +56,18 @@ export default class InstallBinCommand extends Command<CommandContext> {
           await project.resolveEverything({ report, lockfileOnly: true });
           const binaries = await scriptUtils.getPackageAccessibleBinaries(
             project.topLevelWorkspace.anchoredLocator,
-            { project }
+            { project },
           );
           for (const [name, [_, binaryPath]] of binaries.entries()) {
             const wrapperPath = ppath.join(binDir, name as Filename);
             await this.writeWrapper(
               wrapperPath,
               npath.toPortablePath(binaryPath),
-              { configuration, project }
+              { configuration, project },
             );
           }
         }
-      }
+      },
     );
 
     return report.exitCode();
@@ -79,7 +79,7 @@ export default class InstallBinCommand extends Command<CommandContext> {
     {
       configuration,
       project,
-    }: { configuration: Configuration; project: Project }
+    }: { configuration: Configuration; project: Project },
   ) {
     let wrapper;
     switch (configuration.get(`nodeLinker`)) {
@@ -88,14 +88,14 @@ export default class InstallBinCommand extends Command<CommandContext> {
         const nodeOptions = [];
         if (await xfs.existsPromise(pnpPath.cjs)) {
           nodeOptions.push(
-            `--require "${npath.fromPortablePath(pnpPath.cjs)}"`
+            `--require "${npath.fromPortablePath(pnpPath.cjs)}"`,
           );
         }
         if (await xfs.existsPromise(pnpPath.esmLoader)) {
           nodeOptions.push(
             `--experimental-loader "${
               pathToFileURL(npath.fromPortablePath(pnpPath.esmLoader)).href
-            }"`
+            }"`,
           );
         }
         wrapper = renderTmpl(binWrapperPnpTmpl, {
