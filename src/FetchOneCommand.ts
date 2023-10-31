@@ -31,7 +31,7 @@ export default class FetchOneCommand extends Command<CommandContext> {
         const { locatorHash } = structUtils.parseLocator(this.locator, true);
         const pkg = project.originalPackages.get(locatorHash);
         if (!pkg) {
-          report.reportError(0, `Invalid locator`);
+          report.reportError(0, `Invalid locator: ${this.locator}`);
           return;
         }
 

@@ -39,7 +39,7 @@ export default class InjectBuildCommand extends Command<CommandContext> {
         const locator = structUtils.parseLocator(this.locator, true);
         const pkg = project.storedPackages.get(locator.locatorHash);
         if (!pkg) {
-          report.reportError(0, `Invalid locator`);
+          report.reportError(0, `Invalid locator: ${this.locator}`);
           return;
         }
 
