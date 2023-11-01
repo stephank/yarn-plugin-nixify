@@ -325,6 +325,8 @@ export default async (
       ISOLATED: isolatedCode.join("\n"),
       ISOLATED_INTEGRATION: indent("      ", isolatedIntegration.join("\n")),
       NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
+      USES_PNP_LINKER: configuration.get("nodeLinker") === "pnp",
+      USES_NM_LINKER: configuration.get("nodeLinker") === "node-modules",
     });
     await xfs.writeFilePromise(nixExprPath, projectExpr);
 
