@@ -62,7 +62,7 @@ let
   # Create a shell snippet to copy dependencies from a list of derivations.
   mkCacheBuilderForDrvs = drvs:
     writeShellScript "collect-yarn-cache" (lib.concatMapStrings (drv: ''
-      cp ${drv} '${drv.outputFilename}'
+      cp --reflink=auto ${drv} '${drv.outputFilename}'
     '') drvs);
 
 #@@ IF NEED_ISOLATED_BUILD_SUPPRORT
@@ -170,16 +170,16 @@ let
         mkdir -p "$out/libexec/$name"
         tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
-        cp .yarnrc* "$out/libexec/$name"
-        cp ${lockfile} "$out/libexec/$name/yarn.lock"
-        cp --recursive .yarn "$out/libexec/$name"
+        cp --reflink=auto .yarnrc* "$out/libexec/$name"
+        cp --reflink=auto ${lockfile} "$out/libexec/$name/yarn.lock"
+        cp --reflink=auto --recursive .yarn "$out/libexec/$name"
 
         # Copy the Yarn linker output into the package.
 #@@ IF USES_PNP_LINKER
-        cp .pnp.* "$out/libexec/$name"
+        cp --reflink=auto .pnp.* "$out/libexec/$name"
 #@@ ENDIF USES_PNP_LINKER
 #@@ IF USES_NM_LINKER
-        cp --recursive node_modules "$out/libexec/$name"
+        cp --reflink=auto --recursive node_modules "$out/libexec/$name"
 #@@ ENDIF USES_NM_LINKER
       fi
 
