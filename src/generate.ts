@@ -313,7 +313,7 @@ export default async (
   // If isolated builds are used, we rely on the build state, so don't render
   // if a special `--mode` was specified. This is because skipping builds may
   // give us an incomplete build state.
-  if (opts.mode == null || isolatedBuilds.length === 0) {
+  if (opts.mode == null || isolatedIntegration.length === 0) {
     const ident = project.topLevelWorkspace.manifest.name;
     const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
     const projectExpr = renderTmpl(projectExprTmpl, {
