@@ -91,10 +91,10 @@ const compiler = webpack({
                     `return plugin;`,
                     `}`,
                     `};`,
-                  ].join(`\n`)
+                  ].join(`\n`),
                 );
               }
-            }
+            },
           );
         });
       },

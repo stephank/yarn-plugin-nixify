@@ -9,8 +9,11 @@ As an example, to create an isolated build of sqlite3, add the following to
 your `.yarnrc.yml`:
 
 ```yml
+individualNixPackaging: true
 isolatedNixBuilds: ["sqlite3"]
 ```
+
+(`individualNixPackaging` is required to use `isolatedNixBuilds`.)
 
 In your Nix expression, separate options can be set to override attributes of
 these derivations, which is often necessary to provide build inputs. For

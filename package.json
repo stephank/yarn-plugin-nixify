@@ -8,13 +8,13 @@
     "build-dev": "./build.js",
     "fmt": "prettier --write src"
   },
-  "packageManager": "yarn@4.0.1",
+  "packageManager": "yarn@4.1.0",
   "devDependencies": {
     "@babel/core": "^7.11.4",
     "@babel/plugin-proposal-class-properties": "^7.10.4",
     "@babel/plugin-proposal-decorators": "^7.10.5",
     "@babel/preset-typescript": "^7.10.4",
-    "@types/node": "10",
+    "@types/node": "18",
     "@yarnpkg/cli": "^4.0.0",
     "@yarnpkg/core": "^4.0.0",
     "@yarnpkg/fslib": "^3.0.0",

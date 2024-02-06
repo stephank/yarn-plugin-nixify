@@ -79,8 +79,8 @@ jobs:
 
       - name: Test nix-build
         run: |
-          # This delete tests refetching a package with Nix.
-          nix-store --delete /nix/store/*--yarnpkg-core-npm-*
+          # This delete tests refetching the cache with Nix.
+          nix-store --delete /nix/store/*-yarn-cache
           nix-build
 
       - name: Test bin
@@ -91,6 +91,7 @@ jobs:
       - name: Test isolated builds
         run: |
           # Matches example in  ISOLATED_BUILDS.md
+          echo 'individualNixPackaging: true' >> .yarnrc.yml
           echo 'isolatedNixBuilds: ["sqlite3"]' >> .yarnrc.yml
           cat > default.nix << EOF
           { pkgs ? import <nixpkgs> { } }:
@@ -105,4 +106,8 @@ jobs:
           EOF
 
           yarn add sqlite3
+
+          # This delete tests refetching a package with Nix.
+          nix-store --delete /nix/store/*--yarnpkg-core-npm-*
+
           nix-build

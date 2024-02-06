@@ -15,6 +15,13 @@ yarn
 nix-build
 ```
 
+## Since df1c72a (merged 2024-02-06)
+
+- **BREAKING**: The plugin now generates a single derivation for the entire
+  cache directory by default. To restore the old behavior, add
+  `individualNixPackaging: true` to `.yarnrc.yml`. If you were using isolated
+  builds, setting this option is required.
+
 ## Since 00b7adf (merged 2021-12-14)
 
 - **BREAKING**: The plugin now requires Yarn v3.1.

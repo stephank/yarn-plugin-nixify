@@ -20,8 +20,12 @@ import defaultExprTmpl from "./tmpl/default.nix.in";
 import projectExprTmpl from "./tmpl/yarn-project.nix.in";
 import {
   computeFixedOutputStorePath,
+  hexToSri,
   sanitizeDerivationName,
+  sriToHex,
 } from "./nixUtils";
+import { writeNarStream, writeNarStrings } from "./narUtils";
+import { createHash } from "crypto";
 
 const isYarn3 = YarnVersion?.startsWith("3.") || false;
 
@@ -48,6 +52,13 @@ export default async (
     return;
   }
 
+  // Config validation.
+  const isolatedBuilds = configuration.get(`isolatedNixBuilds`);
+  const individualDrvs = configuration.get(`individualNixPackaging`);
+  if (isolatedBuilds.length > 0 && !individualDrvs) {
+    throw Error(`isolatedNixBuilds requires individualNixPackaging to be set`);
+  }
+
   // Determine relative paths for Nix path literals.
   const nixExprPath = configuration.get(`nixExprPath`);
 
@@ -55,14 +66,13 @@ export default async (
   let yarnBinExpr: string;
   if (yarnPathAbs === null) {
     // Assume the current running script is the correct Yarn.
-    const hexHash = await hashUtils.checksumFile(
+    const sha512 = await hashUtils.checksumFile(
       process.argv[1] as PortablePath,
     );
-    const sriHash = "sha512-" + Buffer.from(hexHash, "hex").toString("base64");
     yarnBinExpr = [
       "fetchurl {",
       `  url = "https://repo.yarnpkg.com/${YarnVersion!}/packages/yarnpkg-cli/bin/yarn.js";`,
-      `  hash = "${sriHash}";`,
+      `  hash = "${hexToSri(sha512)}";`,
       "}",
     ].join("\n  ");
   } else if (yarnPathAbs.startsWith(cwd)) {
@@ -113,16 +123,14 @@ export default async (
       ppath.resolve(cwd, "yarn.lock" as PortablePath),
     );
 
-  // Build a list of cache entries so Nix can fetch them.
-  // TODO: See if we can use Nix fetchurl for npm: dependencies.
-  interface CacheEntry {
-    originalFilename: Filename;
-    filename: Filename;
-    sha512: string;
+  // Collect all the cache files used.
+  interface CacheFile {
+    pkg: Package;
+    checksum: string | undefined;
+    cachePath: PortablePath;
   }
-  const cacheEntries: Map<string, CacheEntry> = new Map();
-
-  const cacheFiles = new Set(await xfs.readdirPromise(cache.cwd));
+  const cacheFiles = new Map<Filename, CacheFile>();
+  const allCacheFiles = new Set(await xfs.readdirPromise(cache.cwd));
   const cacheOptions = { unstablePackages: project.conditionalLocators };
   for (const pkg of project.storedPackages.values()) {
     const { locatorHash } = pkg;
@@ -132,36 +140,83 @@ export default async (
       : cache.getLocatorPath(pkg, checksum || null);
     if (!cachePath) continue;
 
-    const filename = ppath.basename(cachePath);
-    if (!cacheFiles.has(filename)) continue;
+    if (!allCacheFiles.has(ppath.basename(cachePath))) continue;
 
-    const locatorStr = structUtils.stringifyLocator(pkg);
-    const sha512 = checksum
-      ? checksum.split(`/`).pop()!
-      : await hashUtils.checksumFile(cachePath);
-    cacheEntries.set(locatorStr, {
-      originalFilename: filename,
-      // Rebuild the filename, because the cache file we're operating on may be
-      // from the mirror directory, which uses different naming.
-      filename: checksum
-        ? cache.getChecksumFilename(pkg, checksum)
-        : cache.getVersionFilename(pkg),
-      sha512,
-    });
+    // Rebuild the filename, because the cache file we're operating on may be
+    // from the mirror directory, which uses different naming.
+    const filename = checksum
+      ? cache.getChecksumFilename(pkg, checksum)
+      : cache.getVersionFilename(pkg);
+
+    cacheFiles.set(filename, { pkg, checksum, cachePath });
   }
 
-  let cacheEntriesCode = `cacheEntries = {\n`;
-  for (const locatorStr of [...cacheEntries.keys()].sort()) {
-    const entry = cacheEntries.get(locatorStr)!;
-    cacheEntriesCode += `${json(locatorStr)} = { ${[
-      `filename = ${json(entry.filename)};`,
-      `sha512 = ${json(entry.sha512)};`,
-    ].join(` `)} };\n`;
+  interface CacheEntry {
+    cachePath: PortablePath;
+    filename: Filename;
+    hash: string;
   }
-  cacheEntriesCode += `};`;
+  const cacheEntries = new Map<string, CacheEntry>();
+  let cacheEntriesCode = "";
+  let combinedHash = "";
+  if (individualDrvs) {
+    // Build a list of cache entries so Nix can fetch them.
+    // TODO: See if we can use Nix fetchurl for npm: dependencies.
+    for (const [
+      filename,
+      { pkg, checksum, cachePath },
+    ] of cacheFiles.entries()) {
+      const locatorStr = structUtils.stringifyLocator(pkg);
+      const sha512 = checksum
+        ? checksum.split(`/`).pop()!
+        : await hashUtils.checksumFile(cachePath);
+      cacheEntries.set(locatorStr, {
+        cachePath,
+        filename,
+        hash: hexToSri(sha512),
+      });
+    }
+
+    cacheEntriesCode = `cacheEntries = {\n`;
+    for (const locatorStr of [...cacheEntries.keys()].sort()) {
+      const entry = cacheEntries.get(locatorStr)!;
+      cacheEntriesCode += `${json(locatorStr)} = { ${[
+        `filename = ${json(entry.filename)};`,
+        `hash = "${entry.hash}";`,
+      ].join(` `)} };\n`;
+    }
+    cacheEntriesCode += `};`;
+  } else {
+    // Hash a NAR of just the cache files we use.
+    const hasher = createHash("sha512");
+    writeNarStrings(hasher, "nix-archive-1", "(", "type", "directory");
+    for (const filename of [...cacheFiles.keys()].sort()) {
+      const { cachePath } = cacheFiles.get(filename)!;
+      const { size } = await xfs.statPromise(cachePath);
+      writeNarStrings(
+        hasher,
+        "entry",
+        "(",
+        "name",
+        filename,
+        "node",
+        "(",
+        "type",
+        "regular",
+        "contents",
+      );
+      await writeNarStream(hasher, size, xfs.createReadStream(cachePath));
+      writeNarStrings(hasher, ")", ")");
+    }
+    writeNarStrings(hasher, ")");
+    hasher.end();
+    // Bit hacky, but hashers always produce a single read.
+    for await (const sha512 of hasher) {
+      combinedHash = hexToSri(sha512);
+    }
+  }
 
   // Generate Nix code for isolated builds.
-  const isolatedBuilds = configuration.get(`isolatedNixBuilds`);
   let isolatedPackages = new Set<Package>();
   let isolatedIntegration = [];
   let isolatedCode = [];
@@ -313,13 +368,16 @@ export default async (
   // If isolated builds are used, we rely on the build state, so don't render
   // if a special `--mode` was specified. This is because skipping builds may
   // give us an incomplete build state.
-  if (opts.mode == null || isolatedBuilds.length === 0) {
+  if (opts.mode == null || isolatedIntegration.length === 0) {
     const ident = project.topLevelWorkspace.manifest.name;
     const projectName = ident ? structUtils.stringifyIdent(ident) : `workspace`;
     const projectExpr = renderTmpl(projectExprTmpl, {
       PROJECT_NAME: json(projectName),
       YARN_BIN: yarnBinExpr,
       LOCKFILE: lockfileExpr,
+      INDIVIDUAL_DRVS: individualDrvs,
+      COMBINED_DRV: !individualDrvs,
+      COMBINED_HASH: combinedHash,
       CACHE_FOLDER: cacheFolderExpr,
       CACHE_ENTRIES: cacheEntriesCode,
       ISOLATED: isolatedCode.join("\n"),
@@ -350,30 +408,49 @@ export default async (
     xfs.existsSync(npath.toPortablePath(`/nix/store`))
   ) {
     await xfs.mktempPromise(async (tempDir) => {
+      const args = ["--add-fixed", "sha512"];
       const toPreload: PortablePath[] = [];
-      for (const [
-        locator,
-        { originalFilename, sha512 },
-      ] of cacheEntries.entries()) {
-        const name = sanitizeDerivationName(locator);
+      if (individualDrvs) {
+        for (const [locator, { cachePath, hash }] of cacheEntries.entries()) {
+          const name = sanitizeDerivationName(locator);
+          // Check to see if the Nix store entry already exists.
+          const storePath = computeFixedOutputStorePath(name, hash);
+          if (!xfs.existsSync(storePath)) {
+            // The nix-store command requires a correct filename on disk, so we
+            // prepare a temporary directory containing all the files to preload.
+            //
+            // Because some names may conflict (e.g. 'typescript-npm-xyz' and
+            // 'typescript-patch-xyz' both have the same derivation name), we
+            // create subdirectories based on hash.
+            const subdir = ppath.join(
+              tempDir,
+              sriToHex(hash).slice(0, 7) as Filename,
+            );
+            await xfs.mkdirPromise(subdir);
+
+            const dst = ppath.join(subdir, name as Filename);
+            await xfs.copyFilePromise(cachePath, dst);
+
+            toPreload.push(dst);
+          }
+        }
+      } else {
+        args.unshift("--recursive");
         // Check to see if the Nix store entry already exists.
-        const hash = Buffer.from(sha512, "hex");
-        const storePath = computeFixedOutputStorePath(name, `sha512`, hash);
+        const storePath = computeFixedOutputStorePath(
+          "yarn-cache",
+          combinedHash,
+          { recursive: true },
+        );
         if (!xfs.existsSync(storePath)) {
-          // The nix-store command requires a correct filename on disk, so we
-          // prepare a temporary directory containing all the files to preload.
-          //
-          // Because some names may conflict (e.g. 'typescript-npm-xyz' and
-          // 'typescript-patch-xyz' both have the same derivation name), we
-          // create subdirectories based on hash.
-          const subdir = ppath.join(tempDir, sha512.slice(0, 7) as Filename);
+          // Same as above, nix-store requires a correct filename.
+          const subdir = ppath.join(tempDir, "yarn-cache");
           await xfs.mkdirPromise(subdir);
-
-          const src = ppath.join(cache.cwd, originalFilename);
-          const dst = ppath.join(subdir, name as Filename);
-          await xfs.copyFilePromise(src, dst);
-
-          toPreload.push(dst);
+          for (const [filename, { cachePath }] of cacheFiles.entries()) {
+            const dst = ppath.join(subdir, filename);
+            await xfs.copyFilePromise(cachePath, dst);
+          }
+          toPreload.push(subdir);
         }
       }
 
@@ -382,19 +459,17 @@ export default async (
         const numToPreload = toPreload.length;
         while (toPreload.length !== 0) {
           const batch = toPreload.splice(0, 100);
-          await execUtils.execvp(
-            "nix-store",
-            ["--add-fixed", "sha512", ...batch],
-            {
-              cwd: project.cwd,
-              strict: true,
-            },
-          );
+          await execUtils.execvp("nix-store", [...args, ...batch], {
+            cwd: project.cwd,
+            strict: true,
+          });
         }
         if (numToPreload !== 0) {
           report.reportInfo(
             0,
-            `Preloaded ${numToPreload} packages into the Nix store`,
+            individualDrvs
+              ? `Preloaded ${numToPreload} packages into the Nix store`
+              : `Preloaded cache into the Nix store`,
           );
         }
       } catch (err: any) {

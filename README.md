@@ -14,9 +14,6 @@ zero-install).
 - A default install-phase that creates executables for you based on `"bin"` in
   your `package.json`, making your package readily installable.
 
-- Granular fetching of dependencies in Nix, speeding up rebuilds and
-  potentially allowing downloads to be shared between projects.
-
 - Preloading of your Yarn cache into the Nix store, speeding up local
   `nix-build`.
 
@@ -130,6 +127,10 @@ Some additional settings are available in `.yarnrc.yml`:
   `nix-build`, because Nix will not have to download dependencies again.
   Preloading does mean another copy of dependencies on disk, even if you don't
   do local Nix builds, but the size is usually not an issue on modern disks.
+
+- `individualNixPackaging` can be set to `true` to create a derivation per
+  dependency. This is useful in some cases, but can significantly slow down
+  builds if cache is cold and preloading is not possible.
 
 - `isolatedNixBuilds`, see [ISOLATED_BUILDS.md](./ISOLATED_BUILDS.md).
 
