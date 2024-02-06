@@ -187,7 +187,7 @@ let
         # - Otherwise all files are copied.
         yarn pack --out package.tgz
         mkdir -p "$out/libexec/$name"
-        tar xzvf package.tgz --directory "$out/libexec/$name" --strip-components=1
+        tar xzf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
         cp --reflink=auto .yarnrc* "$out/libexec/$name"
         cp --reflink=auto ${lockfile} "$out/libexec/$name/yarn.lock"
