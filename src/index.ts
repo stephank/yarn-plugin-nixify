@@ -1,7 +1,7 @@
 import { Hooks, Plugin, SettingsType } from "@yarnpkg/core";
 import { PortablePath } from "@yarnpkg/fslib";
 
-import FetchOneCommand from "./FetchOneCommand";
+import FetchCommand from "./FetchCommand";
 import InjectBuildCommand from "./InjectBuildCommand";
 import InstallBinCommand from "./InstallBinCommand";
 import generate from "./generate";
@@ -12,13 +12,14 @@ declare module "@yarnpkg/core" {
     nixExprPath: PortablePath;
     generateDefaultNix: boolean;
     enableNixPreload: boolean;
+    individualNixPackaging: boolean;
     isolatedNixBuilds: string[];
     installNixBinariesForDependencies: boolean;
   }
 }
 
 const plugin: Plugin<Hooks> = {
-  commands: [FetchOneCommand, InjectBuildCommand, InstallBinCommand],
+  commands: [FetchCommand, InjectBuildCommand, InstallBinCommand],
   hooks: {
     afterAllInstalled: async (project, opts) => {
       if (
@@ -49,6 +50,11 @@ const plugin: Plugin<Hooks> = {
       description: `If true, cached packages will be preloaded into the Nix store`,
       type: SettingsType.BOOLEAN,
       default: true,
+    },
+    individualNixPackaging: {
+      description: `If true, generate one Nix derivation per package. If false, use a single derivation for the entire cache folder.`,
+      type: SettingsType.BOOLEAN,
+      default: false,
     },
     isolatedNixBuilds: {
       description: `Dependencies with a build step that can be built in an isolated derivation`,

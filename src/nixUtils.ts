@@ -44,13 +44,17 @@ export const encodeBase32 = (buf: Buffer) => {
  */
 export const computeFixedOutputStorePath = (
   name: string,
-  hashAlgorithm: string,
-  hash: Buffer,
-  storePath = `/nix/store` as PortablePath,
+  hash: string,
+  {
+    storePath = `/nix/store` as PortablePath,
+    recursive = false,
+  }: { storePath?: PortablePath; recursive?: boolean } = {},
 ) => {
-  const hashHex = hash.toString("hex");
+  const [hashAlgorithm, hash64] = hash.split("-");
+  const hashHex = Buffer.from(hash64, "base64").toString("hex");
 
-  const innerStr = `fixed:out:${hashAlgorithm}:${hashHex}:`;
+  const rec = recursive ? "r:" : "";
+  const innerStr = `fixed:out:${rec}${hashAlgorithm}:${hashHex}:`;
   const innerHash = computeHash(`sha256`, innerStr);
   const innerHashHex = innerHash.toString("hex");
 
@@ -71,3 +75,11 @@ export const sanitizeDerivationName = (name: string) =>
     .replace(/^\.+/, "")
     .replace(/[^a-zA-Z0-9+._?=-]+/g, "-")
     .slice(0, 207) || "unknown";
+
+/** Convert a hexadecimal hash to an SRI hash. */
+export const hexToSri = (hash: string, algorithm = "sha512") =>
+  algorithm + "-" + Buffer.from(hash, "hex").toString("base64");
+
+/** Convert an SRI hash to a hexadecimal hash. */
+export const sriToHex = (hash: string) =>
+  Buffer.from(hash.split("-")[1], "base64").toString("hex");

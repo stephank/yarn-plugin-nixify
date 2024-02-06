@@ -731,10 +731,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:10":
-  version: 10.17.60
-  resolution: "@types/node@npm:10.17.60"
-  checksum: 0742294912a6e79786cdee9ed77cff6ee8ff007b55d8e21170fc3e5994ad3a8101fea741898091876f8dc32b0a5ae3d64537b7176799e92da56346028d2cbcd2
+"@types/node@npm:18":
+  version: 18.19.14
+  resolution: "@types/node@npm:18.19.14"
+  dependencies:
+    undici-types: "npm:~5.26.4"
+  checksum: a614e85d3d75e9bb73c1155f77843804506806629d20774e0479e88678efd64ab57f7bb2ba290b226fe732b6aead037ac181db04851a2f37e1c2a14744ffdb96
   languageName: node
   linkType: hard
 
@@ -3665,7 +3667,7 @@ __metadata:
     "@babel/plugin-proposal-class-properties": "npm:^7.10.4"
     "@babel/plugin-proposal-decorators": "npm:^7.10.5"
     "@babel/preset-typescript": "npm:^7.10.4"
-    "@types/node": "npm:10"
+    "@types/node": "npm:18"
     "@yarnpkg/cli": "npm:^4.0.0"
     "@yarnpkg/core": "npm:^4.0.0"
     "@yarnpkg/fslib": "npm:^3.0.0"

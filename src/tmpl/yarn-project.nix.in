@@ -38,25 +38,38 @@ let
     export yarn_enable_nixify=false
   '';
 
+#@@ IF COMBINED_DRV
+  cacheDrv = stdenv.mkDerivation {
+    name = "yarn-cache";
+    buildInputs = [ yarn git cacert ];
+    buildCommand = ''
+      cp --reflink=auto --recursive '${src}' ./src
+      cd ./src/
+      ${buildVars}
+      HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$out" \
+        yarn nixify fetch
+      rm $out/.gitignore
+    '';
+    outputHashMode = "recursive";
+    outputHash = "@@COMBINED_HASH@@";
+  };
+#@@ ENDIF COMBINED_DRV
+#@@ IF INDIVIDUAL_DRVS
   # Create derivations for fetching dependencies.
   cacheDrvs = let
-    builder = writeShellScript "yarn-cache-builder" ''
-      source $stdenv/setup
-      cd "$src"
+  in lib.mapAttrs (locator: { filename, hash }: stdenv.mkDerivation {
+    name = lib.strings.sanitizeDerivationName locator;
+    buildInputs = [ yarn git cacert ];
+    buildCommand = ''
+      cd '${src}'
       ${buildVars}
       HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$TMP" \
-        yarn nixify fetch-one $locator
+        yarn nixify fetch ${locator}
       # Because we change the cache dir, Yarn may generate a different name.
       mv "$TMP/$(sed 's/-[^-]*\.[^-]*$//' <<< "$outputFilename")"-* $out
     '';
-  in lib.mapAttrs (locator: { filename, sha512 }: stdenv.mkDerivation {
-    inherit src builder locator;
-    name = lib.strings.sanitizeDerivationName locator;
-    buildInputs = [ yarn git cacert ];
     outputFilename = filename;
-    outputHashMode = "flat";
-    outputHashAlgo = "sha512";
-    outputHash = sha512;
+    outputHash = hash;
   }) cacheEntries;
 
   # Create a shell snippet to copy dependencies from a list of derivations.
@@ -64,6 +77,7 @@ let
     writeShellScript "collect-yarn-cache" (lib.concatMapStrings (drv: ''
       cp --reflink=auto ${drv} '${drv.outputFilename}'
     '') drvs);
+#@@ ENDIF INDIVIDUAL_DRVS
 
 #@@ IF NEED_ISOLATED_BUILD_SUPPRORT
   # Create a shell snippet to copy dependencies from a list of locators.
@@ -119,9 +133,14 @@ let
       # Copy over the Yarn cache.
       rm -fr '${cacheFolder}'
       mkdir -p '${cacheFolder}'
+#@@ IF COMBINED_DRV
+      cp --reflink=auto --recursive ${cacheDrv}/* '${cacheFolder}/'
+#@@ ENDIF COMBINED_DRV
+#@@ IF INDIVIDUAL_DRVS
       pushd '${cacheFolder}' > /dev/null
       source ${mkCacheBuilderForDrvs (lib.attrValues cacheDrvs)}
       popd > /dev/null
+#@@ ENDIF INDIVIDUAL_DRVS
 
       # Yarn may need a writable home directory.
       export yarn_global_folder="$TMP"
