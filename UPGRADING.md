@@ -15,6 +15,12 @@ yarn
 nix-build
 ```
 
+## Since b7200c4 (merged 2024-02-11)
+
+- `isolatedBuilds` now also works without `individualNixPackaging`.
+
+- **BREAKING**: During builds, `yarn_enable_network=0` is now set.
+
 ## Since df1c72a (merged 2024-02-06)
 
 - **BREAKING**: The plugin now generates a single derivation for the entire
