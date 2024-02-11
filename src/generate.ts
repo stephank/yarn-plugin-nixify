@@ -52,13 +52,6 @@ export default async (
     return;
   }
 
-  // Config validation.
-  const isolatedBuilds = configuration.get(`isolatedNixBuilds`);
-  const individualDrvs = configuration.get(`individualNixPackaging`);
-  if (isolatedBuilds.length > 0 && !individualDrvs) {
-    throw Error(`isolatedNixBuilds requires individualNixPackaging to be set`);
-  }
-
   // Determine relative paths for Nix path literals.
   const nixExprPath = configuration.get(`nixExprPath`);
 
@@ -157,6 +150,7 @@ export default async (
     hash: string;
   }
   const cacheEntries = new Map<string, CacheEntry>();
+  const individualDrvs = configuration.get(`individualNixPackaging`);
   let cacheEntriesCode = "";
   let combinedHash = "";
   if (individualDrvs) {
@@ -217,6 +211,7 @@ export default async (
   }
 
   // Generate Nix code for isolated builds.
+  const isolatedBuilds = configuration.get(`isolatedNixBuilds`);
   let isolatedPackages = new Set<Package>();
   let isolatedIntegration = [];
   let isolatedCode = [];
@@ -332,19 +327,29 @@ export default async (
     if (!isolatedPackages.has(devirtPkg)) {
       isolatedPackages.add(devirtPkg);
 
-      const locators = [...collectTree(pkg)]
-        .sort()
-        .map((v) => `${json(v)}\n`)
-        .join(``);
+      const args = [
+        `pname = ${json(pkg.name)};`,
+        `version = ${json(pkg.version)};`,
+        `reference = ${json(devirtPkg.reference)};`,
+      ];
+
+      // If packaging deps individually, depend on just
+      // the deps used during this isolated build.
+      if (individualDrvs) {
+        const locators = [...collectTree(pkg)]
+          .sort()
+          .map((v) => `${json(v)}\n`)
+          .join(``);
+        if (locators) {
+          args.push(`locators = [\n${locators}];`);
+        }
+      }
 
       const overrideArg = `override${upperCamelize(pkg.name)}Attrs`;
       isolatedCode.push(
-        `${isolatedProp} = optionalOverride (args.${overrideArg} or null) (mkIsolatedBuild { ${[
-          `pname = ${json(pkg.name)};`,
-          `version = ${json(pkg.version)};`,
-          `reference = ${json(devirtPkg.reference)};`,
-          `locators = [\n${locators}];`,
-        ].join(` `)} });`,
+        `${isolatedProp} = optionalOverride (args.${overrideArg} or null) (mkIsolatedBuild { ${args.join(
+          ` `,
+        )} });`,
       );
     }
 
