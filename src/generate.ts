@@ -390,7 +390,7 @@ export default async (
       NEED_ISOLATED_BUILD_SUPPRORT: isolatedIntegration.length > 0,
       USES_PNP_LINKER: configuration.get("nodeLinker") === "pnp",
       USES_NM_LINKER: configuration.get("nodeLinker") === "node-modules",
-    });
+    }).replace(/\n\n\n+/g, "\n\n");
     await xfs.writeFilePromise(nixExprPath, projectExpr);
 
     // Create a wrapper if it does not exist yet.
