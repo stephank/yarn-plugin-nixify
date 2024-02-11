@@ -24,6 +24,8 @@ let
   drvCommon = {
     # Make sure the build uses the right Node.js version everywhere.
     buildInputs = [ nodejs yarn ];
+    # All dependencies should already be cached.
+    yarn_enable_network = "0";
     # Tell node-gyp to use the provided Node.js headers for native code builds.
     npm_config_nodedir = nodejs;
   };
@@ -80,14 +82,16 @@ let
 #@@ ENDIF INDIVIDUAL_DRVS
 
 #@@ IF NEED_ISOLATED_BUILD_SUPPRORT
+#@@ IF INDIVIDUAL_DRVS
   # Create a shell snippet to copy dependencies from a list of locators.
   mkCacheBuilderForLocators = let
     pickCacheDrvs = map (locator: cacheDrvs.${locator});
   in locators:
     mkCacheBuilderForDrvs (pickCacheDrvs locators);
+#@@ ENDIF INDIVIDUAL_DRVS
 
-  # Create a derivation that builds a node-pre-gyp module in isolation.
-  mkIsolatedBuild = { pname, version, reference, locators }: stdenv.mkDerivation (drvCommon // {
+  # Create a derivation that builds a module in isolation.
+  mkIsolatedBuild = { pname, version, reference, locators ? [] }: stdenv.mkDerivation (drvCommon // {
     inherit pname version;
     dontUnpack = true;
 
@@ -98,16 +102,21 @@ let
 
     buildPhase = ''
       mkdir -p .yarn/cache
+#@@ IF COMBINED_DRV
+      cp --reflink=auto --recursive ${cacheDrv}/* .yarn/cache/
+#@@ ENDIF COMBINED_DRV
+#@@ IF INDIVIDUAL_DRVS
       pushd .yarn/cache > /dev/null
       source ${mkCacheBuilderForLocators locators}
       popd > /dev/null
+#@@ ENDIF INDIVIDUAL_DRVS
 
       echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
       install -m 0600 ${lockfile} ./yarn.lock
       export yarn_global_folder="$TMP"
       export yarn_enable_global_cache=false
       export yarn_enable_immutable_installs=false
-      yarn --immutable-cache
+      yarn
     '';
 
     installPhase = ''
