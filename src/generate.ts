@@ -59,9 +59,13 @@ export default async (
   let yarnBinExpr: string;
   if (yarnPathAbs === null) {
     // Assume the current running script is the correct Yarn.
-    const sha512 = await hashUtils.checksumFile(
-      process.argv[1] as PortablePath,
-    );
+    let text = (await xfs.readFilePromise(process.argv[1] as PortablePath)).toString();
+    // If yarn was installed via Nix, revert shebang patching to get correct checksum
+    if (text.startsWith("#!/nix/store/")) {
+      const code = text.substring(text.indexOf("\n") + 1);
+      text = `#!/usr/bin/env node\n${code}`;
+    }
+    const sha512 = hashUtils.makeHash(Buffer.from(text));
     yarnBinExpr = [
       "fetchurl {",
       `  url = "https://repo.yarnpkg.com/${YarnVersion!}/packages/yarnpkg-cli/bin/yarn.js";`,
