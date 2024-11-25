@@ -23,7 +23,8 @@ pkgs.callPackage ./yarn-project.nix { } {
   src = ./.;
   overrideSqlite3Attrs = old: {
     npm_config_sqlite = "/";  # Don't accidentally use the wrong sqlite.
-    buildInputs = old.buildInputs ++ (with pkgs; [ python3 sqlite ]);
+    nativeBuildInputs = [ pkgs.python311 ];
+    buildInputs = old.buildInputs ++ [ pkgs.sqlite ];
   };
 }
 ```
