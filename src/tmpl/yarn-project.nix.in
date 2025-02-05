@@ -17,7 +17,7 @@ let
 
   # Simple stub that provides the global yarn command.
   yarn = writeShellScriptBin "yarn" ''
-    exec '${nodejs}/bin/node' '${yarnBin}' "$@"
+    exec ${lib.escapeShellArg "${nodejs}/bin/node"} ${lib.escapeShellArg yarnBin} "$@"
   '';
 
   # Common attributes between Yarn derivations.
@@ -45,7 +45,7 @@ let
     name = "yarn-cache";
     buildInputs = [ yarn git cacert ];
     buildCommand = ''
-      cp --reflink=auto --recursive '${src}' ./src
+      cp --reflink=auto --recursive ${lib.escapeShellArg src} ./src
       cd ./src/
       ${buildVars}
       HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$out" \
@@ -63,10 +63,10 @@ let
     name = lib.strings.sanitizeDerivationName locator;
     buildInputs = [ yarn git cacert ];
     buildCommand = ''
-      cd '${src}'
+      cd ${lib.escapeShellArg src}
       ${buildVars}
       HOME="$TMP" yarn_enable_global_cache=false yarn_cache_folder="$TMP" \
-        yarn nixify fetch ${locator}
+        yarn nixify fetch ${lib.escapeShellArg locator}
       # Because we change the cache dir, Yarn may generate a different name.
       mv "$TMP/$(sed 's/-[^-]*\.[^-]*$//' <<< "$outputFilename")"-* $out
     '';
@@ -77,7 +77,7 @@ let
   # Create a shell snippet to copy dependencies from a list of derivations.
   mkCacheBuilderForDrvs = drvs:
     writeShellScript "collect-yarn-cache" (lib.concatMapStrings (drv: ''
-      cp --reflink=auto ${drv} '${drv.outputFilename}'
+      cp --reflink=auto ${lib.escapeShellArg drv} ${lib.escapeShellArg drv.outputFilename}
     '') drvs);
 #@@ ENDIF INDIVIDUAL_DRVS
 
@@ -103,16 +103,16 @@ let
     buildPhase = ''
       mkdir -p .yarn/cache
 #@@ IF COMBINED_DRV
-      cp --reflink=auto --recursive ${cacheDrv}/* .yarn/cache/
+      cp --reflink=auto --recursive ${lib.escapeShellArg cacheDrv}/* .yarn/cache/
 #@@ ENDIF COMBINED_DRV
 #@@ IF INDIVIDUAL_DRVS
       pushd .yarn/cache > /dev/null
-      source ${mkCacheBuilderForLocators locators}
+      source ${lib.escapeShellArg (mkCacheBuilderForLocators locators)}
       popd > /dev/null
 #@@ ENDIF INDIVIDUAL_DRVS
 
-      echo '{ "dependencies": { "${pname}": "${reference}" } }' > package.json
-      install -m 0600 ${lockfile} ./yarn.lock
+      echo ${lib.escapeShellArg (builtins.toJSON { dependencies.${pname} = reference; })} > package.json
+      install -m 0600 ${lib.escapeShellArg lockfile} ./yarn.lock
       export yarn_global_folder="$TMP"
       export yarn_enable_global_cache=false
       export yarn_enable_immutable_installs=false
@@ -120,9 +120,9 @@ let
     '';
 
     installPhase = ''
-      unplugged=( .yarn/unplugged/${pname}-*/node_modules/* )
+      unplugged=( .yarn/unplugged/${lib.escapeShellArg pname}-*/node_modules/* )
       if [[ ! -e "''${unplugged[@]}" ]]; then
-        echo >&2 "Could not find the unplugged path for ${pname}"
+        printf -- >&2 'Could not find the unplugged path for %s\n' ${lib.escapeShellArg pname}
         exit 1
       fi
 
@@ -140,14 +140,14 @@ let
       ${buildVars}
 
       # Copy over the Yarn cache.
-      rm -fr '${cacheFolder}'
-      mkdir -p '${cacheFolder}'
+      rm -fr ${lib.escapeShellArg cacheFolder}
+      mkdir -p ${lib.escapeShellArg cacheFolder}
 #@@ IF COMBINED_DRV
-      cp --reflink=auto --recursive ${cacheDrv}/* '${cacheFolder}/'
+      cp --reflink=auto --recursive ${lib.escapeShellArg cacheDrv}/* ${lib.escapeShellArg cacheFolder}/
 #@@ ENDIF COMBINED_DRV
 #@@ IF INDIVIDUAL_DRVS
-      pushd '${cacheFolder}' > /dev/null
-      source ${mkCacheBuilderForDrvs (lib.attrValues cacheDrvs)}
+      pushd ${lib.escapeShellArg cacheFolder} > /dev/null
+      source ${lib.escapeShellArg (mkCacheBuilderForDrvs (lib.attrValues cacheDrvs))}
       popd > /dev/null
 #@@ ENDIF INDIVIDUAL_DRVS
 
@@ -199,7 +199,7 @@ let
         tar xzf package.tgz --directory "$out/libexec/$name" --strip-components=1
 
         cp --reflink=auto .yarnrc* "$out/libexec/$name"
-        cp --reflink=auto ${lockfile} "$out/libexec/$name/yarn.lock"
+        cp --reflink=auto ${lib.escapeShellArg lockfile} "$out/libexec/$name/yarn.lock"
         cp --reflink=auto --recursive .yarn "$out/libexec/$name"
 
         # Copy the Yarn linker output into the package.
@@ -229,7 +229,9 @@ let
       inherit nodejs;
       yarn-freestanding = yarn;
       yarn = writeShellScriptBin "yarn" ''
-        exec '${yarn}/bin/yarn' --cwd '${overriddenProject}/libexec/${overriddenProject.name}' "$@"
+        exec ${lib.escapeShellArg "${yarn}/bin/yarn"} \
+          --cwd ${lib.escapeShellArg "${overriddenProject}/libexec/${overriddenProject.name}"} \
+          "$@"
       '';
     };
   });
