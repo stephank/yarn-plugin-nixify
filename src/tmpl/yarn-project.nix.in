@@ -231,6 +231,10 @@ let
       yarn = writeShellScriptBin "yarn" ''
         exec '${yarn}/bin/yarn' --cwd '${overriddenProject}/libexec/${overriddenProject.name}' "$@"
       '';
+#@@ IF INDIVIDUAL_DRVS
+      collectCacheScript = mkCacheBuilderForDrvs (lib.attrValues cacheDrvs);
+      cacheDrvs = cacheDrvs;
+#@@ ENDIF INDIVIDUAL_DRVS
     };
   });
 
